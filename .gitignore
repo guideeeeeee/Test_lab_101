@@ -1,0 +1,244 @@
+# Ignore build artifacts and generated files
+
+# ================================================================
+# Operating System Files
+# ================================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*~
+
+# ================================================================
+# IDE and Editor Files
+# ================================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# ================================================================
+# Python
+# ================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+*.mo
+*.pot
+*.log
+local_settings.py
+instance/
+.webassets-cache
+.scrapy
+docs/_build/
+target/
+.ipynb_checkpoints
+.python-version
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# ================================================================
+# Docker
+# ================================================================
+.dockerignore
+Dockerfile.tmp
+docker-compose.override.yml
+
+# ================================================================
+# Certificates and Keys (IMPORTANT!)
+# ================================================================
+*.pem
+*.key
+*.crt
+*.csr
+*.p12
+*.pfx
+*.jks
+certs/
+certs-*/
+!certs/.gitkeep
+!certs-hybrid/.gitkeep
+
+# Exception: Allow example/template certificates
+!certs/example.crt
+!certs/README.md
+
+# ================================================================
+# Lab Generated Data
+# ================================================================
+# Lab results
+results/
+results-*/
+logs/
+logs-*/
+*.log
+*.pcap
+*.pcapng
+
+# Performance data
+data/
+data-*/
+*.json
+!config.json
+!package.json
+!*-template.json
+
+# Charts and reports
+charts/
+reports/
+*.png
+*.pdf
+*.html
+!index.html
+!*-template.html
+
+# ================================================================
+# Temporary Files
+# ================================================================
+tmp/
+temp/
+*.tmp
+*.bak
+*.backup
+*.orig
+.~*
+
+# ================================================================
+# Database
+# ================================================================
+*.db
+*.sqlite
+*.sqlite3
+mysql-data/
+mysql-data-*/
+
+# ================================================================
+# Node.js (if using for tools)
+# ================================================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# ================================================================
+# Compiled Binaries
+# ================================================================
+*.o
+*.a
+*.so
+*.dylib
+*.exe
+*.dll
+bin/
+obj/
+
+# OpenSSL/OQS build artifacts
+openssl-*/
+liboqs-*/
+oqs-provider-*/
+binaries/
+
+# ================================================================
+# Archives
+# ================================================================
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+*.rar
+*.7z
+
+# ================================================================
+# Environment Files
+# ================================================================
+.env
+.env.*
+!.env.example
+.envrc
+*.local
+
+# ================================================================
+# Lab-Specific Ignores
+# ================================================================
+# Lab 00
+labs/00-target-app/logs/
+labs/00-target-app/certs/*.pem
+labs/00-target-app/certs/*.key
+
+# Lab 01
+labs/01-manual-discovery/results/
+labs/01-manual-discovery/worksheets/*-filled.md
+
+# Lab 02
+labs/02-baseline-testing/results/
+labs/02-baseline-testing/data/
+
+# Lab 03
+labs/03-pqc-hybrid-setup/certs-hybrid/
+labs/03-pqc-hybrid-setup/logs/
+labs/03-pqc-hybrid-setup/binaries/
+
+# Lab 04
+labs/04-hybrid-testing/results/
+labs/04-hybrid-testing/data/
+
+# Lab 05
+labs/05-analysis-reporting/reports/
+labs/05-analysis-reporting/charts/
+
+# Bonus Labs
+labs/06-vpn-hybrid/logs/
+labs/06-vpn-hybrid/*.pcap
+labs/07-advanced-workshop/solutions/
+labs/08-compliance-mapping/filled-checklists/
+
+# ================================================================
+# Keep Structure Placeholders
+# ================================================================
+!.gitkeep
+!**/.gitkeep

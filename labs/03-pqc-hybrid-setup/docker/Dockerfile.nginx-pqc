@@ -1,0 +1,183 @@
+# Dockerfile for NGINX with PQC Support
+# Builds NGINX with OpenSSL + liboqs + oqs-provider
+
+FROM ubuntu:22.04
+
+# Avoid interactive prompts
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    git \
+    ninja-build \
+    libssl-dev \
+    wget \
+    curl \
+    ca-certificates \
+    astyle \
+    autoconf \
+    automake \
+    libtool \
+    pkg-config \
+    python3 \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /build
+
+# ================================================================
+# Build liboqs (Open Quantum Safe library)
+# ================================================================
+ARG LIBOQS_VERSION=0.10.1
+
+RUN echo "Building liboqs ${LIBOQS_VERSION}..." && \
+    git clone --branch ${LIBOQS_VERSION} --depth 1 https://github.com/open-quantum-safe/liboqs.git && \
+    cd liboqs && \
+    mkdir build && cd build && \
+    cmake -GNinja \
+        -DCMAKE_INSTALL_PREFIX=/opt/oqs \
+        -DOQS_USE_OPENSSL=ON \
+        -DBUILD_SHARED_LIBS=ON \
+        .. && \
+    ninja && \
+    ninja install && \
+    cd ../.. && \
+    rm -rf liboqs
+
+# ================================================================
+# Build OpenSSL 3.x
+# ================================================================
+ARG OPENSSL_VERSION=3.3.0
+
+RUN echo "Building OpenSSL ${OPENSSL_VERSION}..." && \
+    wget https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz && \
+    tar -xzf openssl-${OPENSSL_VERSION}.tar.gz && \
+    cd openssl-${OPENSSL_VERSION} && \
+    ./config \
+        --prefix=/opt/openssl \
+        --openssldir=/opt/openssl \
+        shared \
+        enable-ec_nistp_64_gcc_128 && \
+    make -j$(nproc) && \
+    make install_sw install_ssldirs && \
+    cd .. && \
+    rm -rf openssl-${OPENSSL_VERSION}*
+
+# ================================================================
+# Build oqs-provider
+# ================================================================
+ARG OQSPROVIDER_VERSION=0.6.1
+
+RUN echo "Building oqs-provider ${OQSPROVIDER_VERSION}..." && \
+    git clone --branch ${OQSPROVIDER_VERSION} --depth 1 https://github.com/open-quantum-safe/oqs-provider.git && \
+    cd oqs-provider && \
+    mkdir build && cd build && \
+    cmake -GNinja \
+        -DCMAKE_PREFIX_PATH=/opt/oqs \
+        -DOPENSSL_ROOT_DIR=/opt/openssl \
+        -DCMAKE_INSTALL_PREFIX=/opt/openssl \
+        .. && \
+    ninja && \
+    ninja install && \
+    cd ../.. && \
+    rm -rf oqs-provider
+
+# Configure OpenSSL to load oqs-provider
+RUN echo "Configuring OpenSSL providers..." && \
+    mkdir -p /opt/openssl/ssl && \
+    cat > /opt/openssl/ssl/openssl.cnf <<EOF
+openssl_conf = openssl_init
+
+[openssl_init]
+providers = provider_sect
+
+[provider_sect]
+default = default_sect
+oqsprovider = oqsprovider_sect
+
+[default_sect]
+activate = 1
+
+[oqsprovider_sect]
+activate = 1
+EOF
+
+# ================================================================
+# Build NGINX with PQC-enabled OpenSSL
+# ================================================================
+ARG NGINX_VERSION=1.24.0
+
+RUN echo "Building NGINX ${NGINX_VERSION}..." && \
+    wget http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz && \
+    tar -xzf nginx-${NGINX_VERSION}.tar.gz && \
+    cd nginx-${NGINX_VERSION} && \
+    ./configure \
+        --prefix=/etc/nginx \
+        --sbin-path=/usr/sbin/nginx \
+        --conf-path=/etc/nginx/nginx.conf \
+        --error-log-path=/var/log/nginx/error.log \
+        --http-log-path=/var/log/nginx/access.log \
+        --pid-path=/var/run/nginx.pid \
+        --lock-path=/var/run/nginx.lock \
+        --with-http_ssl_module \
+        --with-http_v2_module \
+        --with-http_realip_module \
+        --with-http_addition_module \
+        --with-http_sub_module \
+        --with-http_dav_module \
+        --with-http_flv_module \
+        --with-http_mp4_module \
+        --with-http_gunzip_module \
+        --with-http_gzip_static_module \
+        --with-http_random_index_module \
+        --with-http_secure_link_module \
+        --with-http_stub_status_module \
+        --with-http_auth_request_module \
+        --with-threads \
+        --with-stream \
+        --with-stream_ssl_module \
+        --with-http_slice_module \
+        --with-file-aio \
+        --with-openssl=/build/openssl-${OPENSSL_VERSION} \
+        --with-ld-opt="-L/opt/oqs/lib -Wl,-rpath,/opt/oqs/lib" \
+        --with-cc-opt="-I/opt/oqs/include" && \
+    make -j$(nproc) && \
+    make install && \
+    cd .. && \
+    rm -rf nginx-${NGINX_VERSION}*
+
+# ================================================================
+# Runtime configuration
+# ================================================================
+
+# Create nginx user
+RUN useradd -r -M -s /sbin/nologin nginx
+
+# Create necessary directories
+RUN mkdir -p /var/cache/nginx /var/log/nginx /usr/share/nginx/html /etc/nginx/certs && \
+    chown -R nginx:nginx /var/cache/nginx /var/log/nginx /usr/share/nginx/html
+
+# Set library paths
+ENV LD_LIBRARY_PATH=/opt/openssl/lib:/opt/oqs/lib:$LD_LIBRARY_PATH
+ENV PATH=/opt/openssl/bin:$PATH
+
+# Copy default HTML
+RUN echo '<!DOCTYPE html><html><head><title>PQC Hybrid TLS</title></head><body style="font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px;"><h1>🔒 PQC Hybrid TLS Server</h1><p>Successfully connected via <strong>Post-Quantum Cryptography</strong>!</p><ul><li>Key Exchange: ML-KEM-768 (FIPS 203)</li><li>Signature: ML-DSA-65 (FIPS 204)</li><li>Encryption: AES-256-GCM</li></ul><p><a href="/tls-info">View TLS Connection Info</a></p></body></html>' > /usr/share/nginx/html/index.html
+
+# Verify installation
+RUN /opt/openssl/bin/openssl version && \
+    /opt/openssl/bin/openssl list -providers && \
+    nginx -v
+
+# Expose ports
+EXPOSE 80 443
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f -k https://localhost/health || exit 1
+
+# Start NGINX
+CMD ["nginx", "-g", "daemon off;"]

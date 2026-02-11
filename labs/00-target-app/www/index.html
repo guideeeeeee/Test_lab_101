@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Corporate Solutions Inc. - Secure Business Technology</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f4f4f4;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem 0;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        nav {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 2rem;
+        }
+
+        .logo {
+            font-size: 1.8rem;
+            font-weight: bold;
+        }
+
+        .nav-links {
+            list-style: none;
+            display: flex;
+            gap: 2rem;
+        }
+
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            transition: opacity 0.3s;
+        }
+
+        .nav-links a:hover {
+            opacity: 0.8;
+        }
+
+        .hero {
+            background: white;
+            padding: 4rem 2rem;
+            text-align: center;
+        }
+
+        .hero h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            color: #667eea;
+        }
+
+        .hero p {
+            font-size: 1.3rem;
+            color: #666;
+            max-width: 600px;
+            margin: 0 auto 2rem;
+        }
+
+        .badge {
+            display: inline-block;
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            margin-top: 1rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .feature-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            transition: transform 0.3s;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .feature-card h3 {
+            color: #667eea;
+            margin-bottom: 1rem;
+        }
+
+        .security-info {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 1.5rem;
+            margin: 2rem 0;
+            border-radius: 4px;
+        }
+
+        .security-info h3 {
+            color: #856404;
+            margin-bottom: 0.5rem;
+        }
+
+        .tech-stack {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            margin-top: 2rem;
+        }
+
+        .tech-stack h2 {
+            color: #667eea;
+            margin-bottom: 1rem;
+        }
+
+        .tech-list {
+            list-style: none;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .tech-list li {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 4px;
+            border-left: 3px solid #667eea;
+        }
+
+        .tech-list strong {
+            color: #667eea;
+        }
+
+        footer {
+            background: #333;
+            color: white;
+            text-align: center;
+            padding: 2rem;
+            margin-top: 4rem;
+        }
+
+        .warning-quantum {
+            background: #f8d7da;
+            border: 2px solid #dc3545;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 2rem 0;
+        }
+
+        .warning-quantum h3 {
+            color: #721c24;
+            margin-bottom: 1rem;
+        }
+
+        .vulnerable-items {
+            list-style: none;
+            margin-top: 1rem;
+        }
+
+        .vulnerable-items li {
+            padding: 0.5rem 0;
+            padding-left: 2rem;
+            position: relative;
+        }
+
+        .vulnerable-items li:before {
+            content: "⚠️";
+            position: absolute;
+            left: 0;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <nav>
+            <div class="logo">🏢 Corporate Solutions Inc.</div>
+            <ul class="nav-links">
+                <li><a href="/">Home</a></li>
+                <li><a href="/about.html">About</a></li>
+                <li><a href="/products.html">Products</a></li>
+                <li><a href="/api/status">API</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <div class="hero">
+        <h1>Enterprise Technology Solutions</h1>
+        <p>Powering businesses with secure, reliable, and scalable infrastructure since 2015</p>
+        <div class="badge">🔒 Secured with TLS 1.2 (2019 Standard)</div>
+    </div>
+
+    <div class="container">
+        <div class="security-info">
+            <h3>🎯 Lab Purpose: This is a 2019-Standard Test Server</h3>
+            <p>This server demonstrates a typical enterprise HTTPS configuration from 2019, using industry-standard security practices <strong>before</strong> the era of post-quantum cryptography. It serves as a baseline for comparison in the PQC migration labs.</p>
+        </div>
+
+        <div class="features">
+            <div class="feature-card">
+                <div class="feature-icon">🔐</div>
+                <h3>TLS 1.2 Security</h3>
+                <p>Industry-standard encryption protocol providing secure communication channels for all client-server interactions.</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">📜</div>
+                <h3>RSA-2048 Certificates</h3>
+                <p>NIST-recommended 2048-bit RSA certificates providing authentication and secure key exchange.</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h3>Perfect Forward Secrecy</h3>
+<p>ECDHE key exchange ensures that session keys cannot be compromised even if long-term keys are leaked.</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">🚀</div>
+                <h3>High Performance</h3>
+                <p>Optimized cipher suites with hardware acceleration support for maximum throughput.</p>
+            </div>
+        </div>
+
+        <div class="warning-quantum">
+            <h3>⚠️ Quantum Computing Threat (Lab Context)</h3>
+            <p><strong>All cryptographic algorithms on this server are vulnerable to quantum computers!</strong></p>
+            <p>This server uses algorithms that were considered secure in 2019 but will be broken by sufficiently powerful quantum computers:</p>
+            <ul class="vulnerable-items">
+                <li><strong>RSA-2048:</strong> Vulnerable to Shor's algorithm</li>
+                <li><strong>ECDHE (Elliptic Curve):</strong> Vulnerable to Shor's algorithm</li>
+                <li><strong>AES-256:</strong> Partially weakened by Grover's algorithm (but still practical)</li>
+            </ul>
+            <p style="margin-top: 1rem;"><strong>Next steps in this lab:</strong> You'll analyze these vulnerabilities and migrate to hybrid post-quantum cryptography.</p>
+        </div>
+
+        <div class="tech-stack">
+            <h2>Technology Stack (2019 Configuration)</h2>
+            <ul class="tech-list">
+                <li><strong>Web Server:</strong> NGINX 1.18</li>
+                <li><strong>TLS Protocol:</strong> TLS 1.2</li>
+                <li><strong>Certificate:</strong> RSA-2048 (self-signed)</li>
+                <li><strong>Key Exchange:</strong> ECDHE-RSA</li>
+                <li><strong>Cipher:</strong> AES-256-GCM-SHA384</li>
+                <li><strong>Database:</strong> MySQL 5.7</li>
+                <li><strong>Platform:</strong> Docker (Ubuntu 20.04 base)</li>
+                <li><strong>Standards:</strong> Mozilla Intermediate (2019)</li>
+            </ul>
+        </div>
+
+        <div class="tech-stack">
+            <h2>Lab Information</h2>
+            <p><strong>Container:</strong> pqc-target-nginx</p>
+            <p><strong>Purpose:</strong> Baseline server for post-quantum cryptography testing</p>
+            <p><strong>Next Step:</strong> Proceed to <strong>Lab 01: Manual Discovery</strong> to scan and analyze this server's cryptographic configuration.</p>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2019 Corporate Solutions Inc. | This is a lab environment for PQC testing</p>
+        <p style="margin-top: 0.5rem; font-size: 0.9rem; opacity: 0.8;">
+            Lab 00: Target Application (2019 Standard) | 
+            <a href="https://github.com/yourusername/pqcv2" style="color: #667eea;">GitHub Repository</a>
+        </p>
+    </footer>
+</body>
+</html>
