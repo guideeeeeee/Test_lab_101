@@ -1,0 +1,75 @@
+# Docker Compose for PQC Hybrid Setup
+# Lab 03: PQC Hybrid TLS
+
+version: '3.8'
+
+services:
+  # ================================================================
+  # PQC-Enabled NGINX Server
+  # ================================================================
+  nginx-pqc:
+    container_name: pqc-hybrid-nginx
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.nginx-pqc
+    ports:
+      - "8443:443"   # HTTPS with PQC
+      - "8080:80"    # HTTP (redirects to HTTPS)
+    volumes:
+      # NGINX configuration
+      - ./configs/nginx-hybrid.conf:/etc/nginx/nginx.conf:ro
+      
+      # Certificates (mount pre-generated certs)
+      - ./certs-hybrid:/etc/nginx/certs:ro
+      
+      # Website content
+      - ./www:/usr/share/nginx/html:ro
+      
+      # Logs (for analysis)
+      - ./logs:/var/log/nginx
+    networks:
+      - pqc-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-k", "https://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ================================================================
+  # MySQL Database (same as baseline)
+  # ================================================================
+  mysql:
+    container_name: pqc-hybrid-mysql
+    image: mysql:5.7
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: corporatedb
+      MYSQL_USER: dbuser
+      MYSQL_PASSWORD: dbpassword
+    volumes:
+      - mysql-data-hybrid:/var/lib/mysql
+      - ../00-target-app/database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - pqc-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+# ================================================================
+# Networks
+# ================================================================
+networks:
+  pqc-network:
+    driver: bridge
+
+# ================================================================
+# Volumes
+# ================================================================
+volumes:
+  mysql-data-hybrid:
+    driver: local

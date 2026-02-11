@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  nginx:
+    container_name: pqc-target-nginx
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - ./configs/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./configs/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./configs/ssl-params.conf:/etc/nginx/conf.d/ssl-params.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+      - ./www:/usr/share/nginx/html:ro
+    depends_on:
+      - mysql
+    networks:
+      - pqc-network
+    restart: unless-stopped
+
+  mysql:
+    container_name: pqc-target-mysql
+    image: mysql:5.7
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass2019
+      MYSQL_DATABASE: corporate_db
+      MYSQL_USER: webapp
+      MYSQL_PASSWORD: webpass2019
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - pqc-network
+    restart: unless-stopped
+
+networks:
+  pqc-network:
+    driver: bridge
+
+volumes:
+  mysql-data:
