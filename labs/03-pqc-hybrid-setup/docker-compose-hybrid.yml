@@ -1,0 +1,108 @@
+version: '3.8'
+
+services:
+  nginx-pqc-hybrid:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.nginx-pqc
+      args:
+        OPENSSL_VERSION: "3.2.0"
+    container_name: pqc-hybrid-nginx
+    hostname: pqc-lab.local
+    
+    ports:
+      - "8443:443"    # HTTPS with PQC
+      - "8080:80"     # HTTP (redirects to HTTPS)
+    
+    volumes:
+      # Configuration files (read-only)
+      - ./configs/nginx-hybrid.conf:/etc/nginx/nginx.conf:ro
+      - ./configs/ssl-params-hybrid.conf:/etc/nginx/configs/ssl-params-hybrid.conf:ro
+      - ./configs/groups-priority.conf:/etc/nginx/configs/groups-priority.conf:ro
+      
+      # Certificates (read-only for security)
+      - ./certs-hybrid:/etc/nginx/certs:rw
+      
+      # Web content
+      - ./www:/usr/share/nginx/html:ro
+      
+      # Logs (for debugging)
+      - ./logs:/var/log/nginx
+    
+    environment:
+      # Required for OpenSSL to find liboqs and oqs-provider
+      - LD_LIBRARY_PATH=/usr/local/lib:/usr/local/lib64
+      - OPENSSL_CONF=/opt/openssl/ssl/openssl.cnf
+      
+      # Optional: Enable debug logging
+      - NGINX_DEBUG=false
+      
+      # Timezone
+      - TZ=Asia/Bangkok
+    
+    restart: unless-stopped
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-fk", "https://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    networks:
+      - pqc-network
+    
+    labels:
+      - "com.pqc-lab.description=PQC Hybrid TLS Server"
+      - "com.pqc-lab.lab=03-pqc-hybrid-setup"
+      - "com.pqc-lab.version=1.0"
+
+  # Optional: Monitoring with Prometheus (uncomment to enable)
+  # prometheus:
+  #   image: prom/prometheus:latest
+  #   container_name: pqc-prometheus
+  #   ports:
+  #     - "9090:9090"
+  #   volumes:
+  #     - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+  #     - prometheus-data:/prometheus
+  #   command:
+  #     - '--config.file=/etc/prometheus/prometheus.yml'
+  #     - '--storage.tsdb.path=/prometheus'
+  #   networks:
+  #     - pqc-network
+
+  # Optional: Grafana for visualization (uncomment to enable)
+  # grafana:
+  #   image: grafana/grafana:latest
+  #   container_name: pqc-grafana
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     - GF_SECURITY_ADMIN_PASSWORD=admin
+  #   volumes:
+  #     - grafana-data:/var/lib/grafana
+  #   networks:
+  #     - pqc-network
+
+networks:
+  pqc-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+volumes:
+  prometheus-data:
+  grafana-data:

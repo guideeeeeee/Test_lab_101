@@ -93,6 +93,9 @@ openssl s_time -connect localhost:443 -time 30 -new -nbio
 ```bash
 # Monitor NGINX CPU usage
 docker stats pqc-target-nginx --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}"
+
+# แสดงเฉพาะ container ที่กำลังทำงาน
+docker stats pqc-target-nginx --no-trunc --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}"
 ```
 
 **Terminal 2: Generate load**

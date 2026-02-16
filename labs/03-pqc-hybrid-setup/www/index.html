@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>PQC Hybrid TLS Server</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; background: #f5f5f5; }
+        .container { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; }
+        .status { color: #28a745; font-weight: bold; }
+        .info { background: #e7f3ff; padding: 20px; border-left: 4px solid #2196F3; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔒 PQC Hybrid TLS Server</h1>
+        <p class="status">✓ Successfully connected via Post-Quantum Cryptography!</p>
+        <div class="info">
+            <h3>Cryptographic Parameters:</h3>
+            <ul>
+                <li><strong>Key Exchange:</strong> X25519 (Classical ECDH)</li>
+                <li><strong>Digital Signature:</strong> ML-DSA-65 (FIPS 204)</li>
+                <li><strong>Encryption:</strong> AES-256-GCM</li>
+                <li><strong>Protocol:</strong> TLS 1.3</li>
+            </ul>
+        </div>
+        <p><a href="/health">Health Check</a> | <a href="https://github.com/open-quantum-safe" target="_blank">Learn More</a></p>
+    </div>
+</body>
+</html>

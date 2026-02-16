@@ -211,23 +211,28 @@ labs/00-target-app/certs/*.pem
 labs/00-target-app/certs/*.key
 
 # Lab 01
+labs/01-manual-discovery/*.txt
 labs/01-manual-discovery/results/
 labs/01-manual-discovery/worksheets/*-filled.md
 
 # Lab 02
+labs/02-baseline-testing/*.txt
 labs/02-baseline-testing/results/
 labs/02-baseline-testing/data/
 
 # Lab 03
+labs/03-pqc-hybrid-setup/*.txt
 labs/03-pqc-hybrid-setup/certs-hybrid/
 labs/03-pqc-hybrid-setup/logs/
 labs/03-pqc-hybrid-setup/binaries/
 
 # Lab 04
+labs/04-hybrid-testing/*.txt
 labs/04-hybrid-testing/results/
 labs/04-hybrid-testing/data/
 
 # Lab 05
+labs/05-analysis-reporting/*.txt
 labs/05-analysis-reporting/reports/
 labs/05-analysis-reporting/charts/
 
