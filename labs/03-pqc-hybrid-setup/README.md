@@ -137,116 +137,83 @@ openssl list -signature-algorithms
 
 ---
 
-## 🔐 Part 3: Generate Hybrid Certificates (20 min)
+## 🔐 Part 3: Generate Hybrid Certificates (5 min)
 
-### ⚠️ Important: Choose Your Path
+### ✨ Automated Certificate Generation
 
-**If using Docker (Part 4):**
-- ✅ **Option A: Generate inside Docker** (Recommended)
-  - Skip Part 3 now
-  - Create dummy certificates first
-  - Generate real certificates after Docker builds
-  - See "Option A" below
+**Docker automatically generates PQC hybrid certificates on first start!**
 
-**If building manually (Part 2):**
-- ✅ **Option B: Generate on host**
-  - Need OpenSSL+OQS installed first (Part 2)
-  - Follow normal steps below
-  - See "Option B" below
+No manual steps required. The container will:
+1. Detect if certificates exist
+2. If not, generate hybrid certificates automatically:
+   - **CA:** P-384 + ML-DSA-65
+   - **Server:** P-384 + ML-DSA-65
+3. Start NGINX with PQC hybrid TLS
 
 ---
 
-### Option A: For Docker Users (Skip to Part 4)
-
-**Step 1: Create dummy certificates** (temporary)
+### Quick Setup
 
 ```bash
-cd ~/pqcv2/labs/03-pqc-hybrid-setup/certs-hybrid
+cd ~/pqcv2/labs/03-pqc-hybrid-setup
 
-# Create dummy self-signed certificates for initial Docker build
-# These will be replaced with real PQC certificates later
+# Option 1: Using setup script
+./setup.sh
 
-openssl req -x509 -newkey rsa:2048 -nodes \
-  -keyout hybrid-ecdsa.key \
-  -out hybrid-ecdsa.crt \
-  -days 365 -subj "/CN=pqc-lab.local"
-
-cp hybrid-ecdsa.key hybrid-mldsa.key
-cp hybrid-ecdsa.crt hybrid-mldsa.crt
-
-echo "✅ Dummy certificates created for Docker build"
-echo "⚠️  These are NOT PQC certificates yet!"
-echo "📝 You'll generate real PQC certificates after Docker build (see Part 4)"
+# Option 2: Using pqc.sh helper (recommended)
+./pqc.sh build   # Build Docker image
+./pqc.sh start   # Start and auto-generate certs
+./pqc.sh certs   # View certificate details
 ```
 
-**Step 2: After Docker builds** (in Part 4), generate real PQC certificates:
-
-```bash
-# After docker-compose build completes...
-
-# Generate real PQC certificates inside container
-docker exec pqc-hybrid-nginx bash -c "
-cd /tmp && \
-openssl ecparam -name prime256v1 -genkey -out ecdsa.key && \
-openssl req -new -x509 -key ecdsa.key -out ecdsa.crt -days 365 -subj '/CN=pqc-lab.local' && \
-openssl genpkey -algorithm mldsa65 -out mldsa.key && \
-openssl req -new -x509 -key mldsa.key -out mldsa.crt -days 365 -subj '/CN=pqc-lab.local' && \
-cp ecdsa.* mldsa.* /etc/nginx/certs/
-"
-
-# Restart NGINX to load new certificates
-docker-compose -f docker-compose-hybrid.yml restart
-
-echo "✅ Real PQC certificates generated!"
-```
-
-**➡️ Skip to Part 4 now if using Docker**
+**That's it!** Certificates are created automatically.
 
 ---
 
-### Option B: For Manual Build Users
+### Manual Certificate Generation (Optional)
 
-⚠️ **Prerequisites:** You must complete Part 2 (build OpenSSL+OQS) first!
-
-### Step 3.1: Understanding Certificate Requirements
-
-For hybrid setup, we need:
-1. **Traditional certificate** (ECDSA or RSA) - for compatibility
-2. **PQC certificate** (ML-DSA) - for quantum resistance
-3. Optional: **Composite/Dual certificate** (both in one)
-
-### Step 3.2: Generate Hybrid Certificate
-
-⚠️ **This requires OpenSSL with OQS installed!** (Part 2 must be complete)
+If you need to regenerate certificates manually:
 
 ```bash
-cd certs-hybrid/  # Note: certs-hybrid, not certs/
+# Inside container
+docker compose -f docker-compose-hybrid.yml exec nginx-pqc-hybrid bash
+/usr/local/bin/generate-pqc-certs.sh
 
-# Method 1: ECDSA + MLDSA65 (recommended)
-../scripts/generate-hybrid-cert.sh --type ecdsa-mldsa
-
-# Method 2: RSA + MLDSA65 (larger but more compatible)
-../scripts/generate-hybrid-cert.sh --type rsa-mldsa
-
-# Method 3: Pure MLDSA65 (smallest but less compatible)
-../scripts/generate-hybrid-cert.sh --type pure-mldsa
+# Or using helper script
+./pqc.sh gencerts
 ```
 
-**What this creates:**
+---
+
+### Understanding Certificate Structure
+
+The auto-generated certificates use:
+- **Algorithm:** P-384 + ML-DSA-65 (Hybrid)
+- **CA Certificate:** Self-signed root CA
+- **Server Certificate:** Signed by CA
+- **Subject Alt Names:** pqc-lab.local, localhost, 127.0.0.1
+
+**Certificate files created:**
 ```
-certs-hybrid/  # Note: directory name
-├── hybrid-ecdsa.key    (ECDSA P-256 private key)
-├── hybrid-ecdsa.crt    (ECDSA certificate)
-├── hybrid-mldsa.key    (ML-DSA-65 private key)
-├── hybrid-mldsa.crt    (ML-DSA-65 certificate)
-└── hybrid-chain.pem    (Combined chain for dual-cert setup)
+certs-hybrid/
+├── ca-hybrid.key           (CA private key)
+├── ca-hybrid.crt           (CA certificate)
+├── server-hybrid.key       (Server private key)
+├── server-hybrid.crt       (Server certificate)
+└── fullchain-hybrid.crt    (Full certificate chain)
 ```
 
 📖 **Detailed guide:** [guides/04-certificate-generation.md](guides/04-certificate-generation.md)
 
 ### Step 3.3: Inspect PQC Certificate
 
-⚠️ **Requires OpenSSL with OQS**
+✅ **Inspect certificates using container's OQS-enabled OpenSSL**
+
+```bash
+# Using pqc.sh helper
+./pqc.sh certs
+
+# Or manually
 
 ```bash
 # View ML-DSA certificate (if you generated with Option B)
@@ -373,25 +340,22 @@ Test different PQC algorithms and record observations:
 
 ## 🎯 Lab Checklist
 
-**Option A: Docker Users** (Recommended)
+**Docker Users** (Recommended - Automated Setup)
 - [ ] Read PQC introduction guides
-- [ ] Created dummy RSA certificates (`create-dummy-certs.sh`)
-- [ ] Built PQC-enabled container (`docker-compose build`)
-- [ ] Started container (`docker-compose up -d`)
-- [ ] Generated real PQC certificates in container (`generate-pqc-certs-in-docker.sh`)
-- [ ] Inspected ML-DSA certificate
+- [ ] Built PQC-enabled container (`./setup.sh` or `./pqc.sh build`)
+- [ ] Started container (certificates auto-generated on first start)
+- [ ] Verified PQC certificates were created
+- [ ] Inspected hybrid certificate (P-384 + ML-DSA-65)
 - [ ] Tested hybrid connection (X25519+MLKEM768)
-- [ ] Verified certificate serving
+- [ ] Verified TLS handshake using PQC algorithms
 - [ ] Container running on port 8443
 
-**Option B: Manual Build Users**
+**Manual Certificate Generation** (Optional - Advanced Users)
 - [ ] Read PQC introduction guides
-- [ ] Built OpenSSL+OQS from source (Part 2)
-- [ ] Listed available KEM algorithms
-- [ ] Generated hybrid certificates with host OpenSSL (`generate-hybrid-cert.sh`)
-- [ ] Inspected ML-DSA certificate
-- [ ] Configured NGINX for hybrid TLS
-- [ ] Tested hybrid connection (X25519+MLKEM768)
+- [ ] Container running with OQS-enabled OpenSSL
+- [ ] Manually generated certificates: `./pqc.sh gencerts`
+- [ ] Inspected certificate details
+- [ ] Tested different PQC algorithm combinations
 - [ ] Verified certificate serving
 - [ ] Server running on port 8443
 
@@ -416,11 +380,10 @@ labs/03-pqc-hybrid-setup/
 │   └── IMPORTANT-PATH-NOTES.md (Path naming clarification)
 │
 ├── scripts/
-│   ├── create-dummy-certs.sh ✨ (Phase 1: Temporary RSA certs for Docker)
-│   ├── generate-hybrid-cert.sh (Manual: PQC cert generation on host)
-│   ├── generate-pqc-certs-in-docker.sh ✨ (Phase 2: Real PQC certs in container)
+│   ├── docker-entrypoint.sh ⭐ (Auto-generate certs on container start)
+│   ├── generate-pqc-certs.sh ⭐ (Main cert generation script)
 │   ├── test-algorithms.sh (test all KEMs)
-│   └── benchmark-pqc.sh (quick performance test)
+│   └── benchmark-pqc.sh (performance testing)
 │
 ├── configs/
 │   ├── nginx-hybrid.conf (main config)
@@ -442,36 +405,48 @@ labs/03-pqc-hybrid-setup/
 
 ## 🐛 Troubleshooting
 
-### Issue: "No such file or directory: certs-hybrid/"
+### Issue: Container fails to start or certificates not found
 
-**Docker users:** You need certificates before building Docker image!
+**Solution:** Ensure `certs-hybrid/` directory exists and is writable
 
 ```bash
-# Phase 1: Create dummy certificates
-./scripts/create-dummy-certs.sh
+# Create directory if missing
+mkdir -p certs-hybrid
 
-# These are temporary RSA certs for initial Docker build
-# You'll generate real PQC certs after Docker is running
+# Start container - certificates will be auto-generated
+./pqc.sh start
+
+# View logs to see certificate generation
+./pqc.sh logs
 ```
 
-### Issue: "generate-hybrid-cert.sh" fails with Exit Code 1
+### Issue: Certificates not auto-generated
 
-**Cause:** You don't have OpenSSL+OQS on host system.
-
-**Docker users:** Use the two-phase approach:
-1. Create dummy certs first (`create-dummy-certs.sh`)
-2. Build Docker with those dummy certs
-3. Generate real PQC certs inside container (`generate-pqc-certs-in-docker.sh`)
-
-**Manual users:** Complete Part 2 first to build OpenSSL+OQS on your host.
-
-### Issue: "unknown group name: x25519_kyber768"
+**Check logs for errors:**
 
 ```bash
-# Check if oqs-provider is loaded
-openssl list -providers
+# View container logs
+./pqc.sh logs
 
-# Should show: oqsprovider
+# Manually generate certificates
+./pqc.sh gencerts
+```
+
+**Common causes:**
+- `certs-hybrid/` not writable
+- oqsprovider not loaded in container
+- OpenSSL configuration issue
+
+### Issue: "unknown group name: x25519_mlkem768"
+
+**Cause:** NGINX not compiled with OQS-enabled OpenSSL
+
+```bash
+# Verify oqs-provider is loaded in container
+docker compose -f docker-compose-hybrid.yml exec nginx-pqc-hybrid \
+  /opt/openssl/bin/openssl list -providers
+
+# Should show: oqsprovider with "status: active"
 
 # If not, check LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=/path/to/openssl-oqs/lib:$LD_LIBRARY_PATH

@@ -31,8 +31,17 @@ services:
     
     environment:
       # Required for OpenSSL to find liboqs and oqs-provider
-      - LD_LIBRARY_PATH=/usr/local/lib:/usr/local/lib64
+      - LD_LIBRARY_PATH=/opt/openssl/lib64:/opt/oqs/lib
       - OPENSSL_CONF=/opt/openssl/ssl/openssl.cnf
+      - PATH=/opt/openssl/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      
+      # Certificate auto-generation
+      - AUTO_GENERATE_CERTS=yes
+      - CERT_COUNTRY=TH
+      - CERT_STATE=Bangkok
+      - CERT_LOCALITY=Bangkok
+      - CERT_ORG=PQC Lab
+      - CERT_CN=pqc-lab.local
       
       # Optional: Enable debug logging
       - NGINX_DEBUG=false

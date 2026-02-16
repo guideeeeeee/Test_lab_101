@@ -13,6 +13,8 @@ RUN apt-get update && apt-get install -y \
     git \
     ninja-build \
     libssl-dev \
+    libpcre3-dev \
+    zlib1g-dev \
     wget \
     curl \
     ca-certificates \
@@ -31,7 +33,8 @@ WORKDIR /build
 # ================================================================
 # Build liboqs (Open Quantum Safe library)
 # ================================================================
-ARG LIBOQS_VERSION=0.10.1
+# Note: Using main branch to get latest stable version
+ARG LIBOQS_VERSION=main
 
 RUN echo "Building liboqs ${LIBOQS_VERSION}..." && \
     git clone --branch ${LIBOQS_VERSION} --depth 1 https://github.com/open-quantum-safe/liboqs.git && \
@@ -64,12 +67,14 @@ RUN echo "Building OpenSSL ${OPENSSL_VERSION}..." && \
     make -j$(nproc) && \
     make install_sw install_ssldirs && \
     cd .. && \
-    rm -rf openssl-${OPENSSL_VERSION}*
+    rm -f openssl-${OPENSSL_VERSION}.tar.gz
 
 # ================================================================
 # Build oqs-provider
 # ================================================================
-ARG OQSPROVIDER_VERSION=0.6.1
+# Note: Using main branch to ensure compatibility with latest liboqs
+# Supports both NIST names (mlkem, mldsa) and legacy names (kyber, dilithium)
+ARG OQSPROVIDER_VERSION=main
 
 RUN echo "Building oqs-provider ${OQSPROVIDER_VERSION}..." && \
     git clone --branch ${OQSPROVIDER_VERSION} --depth 1 https://github.com/open-quantum-safe/oqs-provider.git && \
@@ -103,6 +108,7 @@ activate = 1
 
 [oqsprovider_sect]
 activate = 1
+module = /opt/openssl/lib64/ossl-modules/oqsprovider.so
 EOF
 
 # ================================================================
@@ -142,12 +148,12 @@ RUN echo "Building NGINX ${NGINX_VERSION}..." && \
         --with-http_slice_module \
         --with-file-aio \
         --with-openssl=/build/openssl-${OPENSSL_VERSION} \
-        --with-ld-opt="-L/opt/oqs/lib -Wl,-rpath,/opt/oqs/lib" \
-        --with-cc-opt="-I/opt/oqs/include" && \
+        --with-ld-opt="-L/opt/openssl/lib64 -L/opt/oqs/lib -Wl,-rpath,/opt/openssl/lib64:/opt/oqs/lib" \
+        --with-cc-opt="-I/opt/openssl/include -I/opt/oqs/include" && \
     make -j$(nproc) && \
     make install && \
     cd .. && \
-    rm -rf nginx-${NGINX_VERSION}*
+    rm -rf nginx-${NGINX_VERSION}* openssl-${OPENSSL_VERSION}
 
 # ================================================================
 # Runtime configuration
@@ -160,17 +166,37 @@ RUN useradd -r -M -s /sbin/nologin nginx
 RUN mkdir -p /var/cache/nginx /var/log/nginx /usr/share/nginx/html /etc/nginx/certs && \
     chown -R nginx:nginx /var/cache/nginx /var/log/nginx /usr/share/nginx/html
 
-# Set library paths
-ENV LD_LIBRARY_PATH=/opt/openssl/lib:/opt/oqs/lib:$LD_LIBRARY_PATH
+# Setup environment variables for OpenSSL and liboqs
 ENV PATH=/opt/openssl/bin:$PATH
+ENV LD_LIBRARY_PATH=/opt/openssl/lib64:/opt/oqs/lib:$LD_LIBRARY_PATH
+ENV OPENSSL_CONF=/opt/openssl/ssl/openssl.cnf
 
 # Copy default HTML
 RUN echo '<!DOCTYPE html><html><head><title>PQC Hybrid TLS</title></head><body style="font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px;"><h1>🔒 PQC Hybrid TLS Server</h1><p>Successfully connected via <strong>Post-Quantum Cryptography</strong>!</p><ul><li>Key Exchange: ML-KEM-768 (FIPS 203)</li><li>Signature: ML-DSA-65 (FIPS 204)</li><li>Encryption: AES-256-GCM</li></ul><p><a href="/tls-info">View TLS Connection Info</a></p></body></html>' > /usr/share/nginx/html/index.html
 
+# Copy certificate generation and entrypoint scripts
+COPY scripts/generate-pqc-certs.sh /usr/local/bin/
+COPY scripts/docker-entrypoint.sh /usr/local/bin/
+
+# Make scripts executable
+RUN chmod +x /usr/local/bin/generate-pqc-certs.sh && \
+    chmod +x /usr/local/bin/docker-entrypoint.sh
+
 # Verify installation
-RUN /opt/openssl/bin/openssl version && \
+RUN echo "=== Verifying Installation ===" && \
+    /opt/openssl/bin/openssl version && \
+    echo "" && \
+    echo "=== Checking Providers ===" && \
     /opt/openssl/bin/openssl list -providers && \
-    nginx -v
+    echo "" && \
+    echo "=== NGINX Version ===" && \
+    nginx -v 2>&1 && \
+    echo "" && \
+    echo "=== Checking PQC Algorithms ===" && \
+    echo "KEM Algorithms:" && \
+    /opt/openssl/bin/openssl list -kem-algorithms -provider oqsprovider | grep -i mlkem | head -5 || echo "Note: Check provider loading" && \
+    echo "Signature Algorithms:" && \
+    /opt/openssl/bin/openssl list -signature-algorithms -provider oqsprovider | grep -i mldsa | head -5 || echo "Note: Check provider loading"
 
 # Expose ports
 EXPOSE 80 443
@@ -178,6 +204,9 @@ EXPOSE 80 443
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f -k https://localhost/health || exit 1
+
+# Set entrypoint to handle certificate generation
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
 # Start NGINX
 CMD ["nginx", "-g", "daemon off;"]
