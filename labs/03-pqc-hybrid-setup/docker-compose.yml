@@ -19,8 +19,8 @@ services:
       # NGINX configuration
       - ./configs/nginx-hybrid.conf:/etc/nginx/nginx.conf:ro
       
-      # Certificates (mount pre-generated certs)
-      - ./certs-hybrid:/etc/nginx/certs:ro
+      # Certificates (writable - entrypoint auto-generates on first run)
+      - ./certs-hybrid:/etc/nginx/certs
       
       # Website content
       - ./www:/usr/share/nginx/html:ro

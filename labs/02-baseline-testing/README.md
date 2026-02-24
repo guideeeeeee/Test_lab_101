@@ -75,8 +75,8 @@ Calculate:
 ### Using openssl s_time (Alternative)
 
 ```bash
-# Test connections for 30 seconds
-openssl s_time -connect localhost:443 -time 30 -new -nbio
+# Test connections for 30 seconds (secure server = baseline before PQC)
+openssl s_time -connect localhost:4431 -time 30 -new -nbio
 
 # Look for:
 # - Number of connections
@@ -91,17 +91,17 @@ openssl s_time -connect localhost:443 -time 30 -new -nbio
 
 **Terminal 1: Start monitoring**
 ```bash
-# Monitor NGINX CPU usage
-docker stats pqc-target-nginx --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}"
+# Monitor NGINX CPU usage (secure server = pre-PQC baseline)
+docker stats pqc-nginx-secure --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}"
 
 # แสดงเฉพาะ container ที่กำลังทำงาน
-docker stats pqc-target-nginx --no-trunc --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}"
+ docker stats pqc-nginx-secure --no-trunc --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}"
 ```
 
 **Terminal 2: Generate load**
 ```bash
-# Generate 100 requests
-ab -n 100 -c 10 https://localhost/
+# Generate 100 requests (secure server = baseline)
+ab -n 100 -c 10 https://localhost:4431/
 ```
 
 **Record measurements:**
@@ -136,14 +136,14 @@ sudo perf report
 ### Using Apache Bench
 
 ```bash
-# Test 1: 1000 requests, 10 concurrent
-ab -n 1000 -c 10 https://localhost/ 2>&1 | tee ab-test1.txt
+# Test 1: 1000 requests, 10 concurrent (secure server = baseline)
+ab -n 1000 -c 10 https://localhost:4431/ 2>&1 | tee ab-test1.txt
 
 # Test 2: 5000 requests, 50 concurrent
-ab -n 5000 -c 50 https://localhost/ 2>&1 | tee ab-test2.txt
+ab -n 5000 -c 50 https://localhost:4431/ 2>&1 | tee ab-test2.txt
 
 # Test 3: 10000 requests, 100 concurrent
-ab -n 10000 -c 100 https://localhost/ 2>&1 | tee ab-test3.txt
+ab -n 10000 -c 100 https://localhost:4431/ 2>&1 | tee ab-test3.txt
 ```
 
 ### Extract Key Metrics
@@ -164,8 +164,8 @@ grep "Transfer rate" ab-test*.txt
 ### Certificate Size
 
 ```bash
-# Get certificate chain
-openssl s_client -connect localhost:443 -showcerts </dev/null 2>/dev/null | \
+# Get certificate chain (secure server)
+openssl s_client -connect localhost:4431 -showcerts </dev/null 2>/dev/null | \
   sed -n '/BEGIN CERTIFICATE/,/END CERTIFICATE/p' > cert-chain.pem
 
 # Check size

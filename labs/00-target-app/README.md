@@ -43,29 +43,33 @@ After this lab, you will be able to:
 ## 🏗️ Architecture | สถาปัตยกรรม
 
 ```
-┌─────────────────────────────────────────┐
-│   Docker Container                       │
-│                                         │
-│   ┌─────────────────────────────────┐   │
-│   │   NGINX 1.18 (Ubuntu 20.04)     │   │
-│   │                                 │   │
-│   │   ├── TLS 1.2 (primary)         │   │
-│   │   ├── TLS 1.3 (disabled)        │   │
-│   │   ├── RSA-2048 Certificate       │   │
-│   │   └── Static Corporate Website   │   │
-│   │                                 │   │
-│   │   Cipher Suites (2019 standard): │   │
-│   │   1. ECDHE-RSA-AES256-GCM-SHA384│   │
-│   │   2. ECDHE-RSA-AES128-GCM-SHA256│   │
-│   │   3. ECDHE-RSA-CHACHA20-POLY1305│   │
-│   └─────────────────────────────────┘   │
-│                                         │
-│   MySQL 5.7 Database                     │
-│   (for realistic corporate setup)        │
-└─────────────────────────────────────────┘
+┌──────────────────────────────────────────────┐
+│   Docker Containers (docker-compose)          │
+│                                              │
+│   ┌──────────────────────────────────────┐   │
+│   │  pqc-nginx-vulnerable  (port 4430)   │   │
+│   │                                      │   │
+│   │  ├── TLS 1.0 / 1.1 / 1.2            │   │
+│   │  ├── 3DES, CBC ciphers               │   │
+│   │  ├── DH-1024 bit                     │   │
+│   │  └── Mimics Supreme.swu.ac.th        │   │
+│   └──────────────────────────────────────┘   │
+│                                              │
+│   ┌──────────────────────────────────────┐   │
+│   │  pqc-nginx-secure      (port 4431)   │   │
+│   │                                      │   │
+│   │  ├── TLS 1.3 + TLS 1.2 only         │   │
+│   │  ├── AEAD ciphers only               │   │
+│   │  ├── HSTS enabled                    │   │
+│   │  └── Hardened 2026 baseline          │   │
+│   └──────────────────────────────────────┘   │
+│                                              │
+│   MySQL 5.7 Database                          │
+│   (shared backend for both servers)           │
+└──────────────────────────────────────────────┘
          │
-         │ Port 443 (HTTPS)
-         │ Port 80 (HTTP redirect)
+         │ Port 4430 (HTTPS - Vulnerable)
+         │ Port 4431 (HTTPS - Secure)
          ↓
     Your Browser
 ```
@@ -134,21 +138,21 @@ chmod +x setup.sh
 [2/6] Generating RSA-2048 certificates...    ✓
 [3/6] Building NGINX container...            ✓
 [4/6] Starting MySQL database...             ✓
-[5/6] Starting NGINX server...               ✓
+[5/6] Starting NGINX servers (vulnerable: 4430 | secure: 4431)...  ✓
 [6/6] Verifying deployment...                ✓
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-✅ Target application is running!
+✅ Target applications are running!
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  URL: https://localhost
-  Status: 200 OK
-  TLS: 1.2 (ECDHE-RSA-AES256-GCM-SHA384)
+  [VULNERABLE] https://localhost:4430  →  Status: 200 OK
+  [SECURE]     https://localhost:4431  →  Status: 200 OK
 
 Next steps:
-  1. Open browser: https://localhost
-  2. Test CLI: curl -k https://localhost
-  3. Check TLS: openssl s_client -connect localhost:443
+  1. Vulnerable: curl -k https://localhost:4430
+  2. Secure:     curl -k https://localhost:4431
+  3. Compare TLS: openssl s_client -connect localhost:4430 -brief
+                  openssl s_client -connect localhost:4431 -brief
 ```
 
 ---
@@ -172,32 +176,40 @@ You should see a **corporate website** with navigation menu.
 ### Method 2: Command Line (curl)
 
 ```bash
-curl -k https://localhost
+# Vulnerable server
+curl -k https://localhost:4430
+
+# Secure server
+curl -k https://localhost:4431
 ```
 
-**Expected output:** HTML content of the homepage
+**Expected output:** HTML content of the homepage (same site, different TLS config)
 
-### Method 3: OpenSSL Client
+### Method 3: OpenSSL Client — Compare both servers
 
 ```bash
-openssl s_client -connect localhost:443 -brief
+# Vulnerable server (expects TLS 1.0/1.1/1.2 + weak ciphers)
+openssl s_client -connect localhost:4430 -brief
+
+# Secure server (expects TLS 1.3 + AEAD only)
+openssl s_client -connect localhost:4431 -brief
 ```
 
-**Expected output:**
+**Vulnerable expected output:**
 ```
 CONNECTION ESTABLISHED
 Protocol version: TLSv1.2
-Ciphersuite: ECDHE-RSA-AES256-GCM-SHA384
+Ciphersuite: ECDHE-RSA-AES256-SHA384
 Peer certificate: CN = corporate-2019.local
-Hash used: SHA256
-Signature type: RSA-PSS
-Verification: self signed certificate
 ```
 
-**Key observations:**
-- ✅ Protocol: **TLSv1.2** (not 1.3)
-- ✅ Cipher: **ECDHE-RSA-AES256-GCM-SHA384**
-- ✅ Signature: **RSA**
+**Secure expected output:**
+```
+CONNECTION ESTABLISHED
+Protocol version: TLSv1.3
+Ciphersuite: TLS_AES_256_GCM_SHA384
+Peer certificate: CN = corporate-2019.local
+```
 
 ### Method 4: Check Running Containers
 
@@ -207,9 +219,10 @@ docker ps
 
 **Expected output:**
 ```
-CONTAINER ID   IMAGE                    STATUS
-abc123def456   pqc-target-nginx         Up 2 minutes
-789ghi012jkl   mysql:5.7                Up 2 minutes
+CONTAINER ID   IMAGE                         STATUS
+abc123def456   pqc-nginx-vulnerable          Up 2 minutes
+def456ghi789   pqc-nginx-secure              Up 2 minutes
+789ghi012jkl   mysql:5.7                     Up 2 minutes
 ```
 
 ---
@@ -314,7 +327,11 @@ Before proceeding to next labs, collect some quick metrics:
 ### Handshake Time
 
 ```bash
-curl -k -o /dev/null -s -w "Time: %{time_connect}s\n" https://localhost
+# Vulnerable server
+curl -k -o /dev/null -s -w "Time: %{time_connect}s\n" https://localhost:4430
+
+# Secure server
+curl -k -o /dev/null -s -w "Time: %{time_connect}s\n" https://localhost:4431
 ```
 
 **Expected:** 0.010 - 0.050 seconds (10-50ms)
@@ -322,7 +339,7 @@ curl -k -o /dev/null -s -w "Time: %{time_connect}s\n" https://localhost
 ### Certificate Size
 
 ```bash
-openssl s_client -connect localhost:443 -showcerts </dev/null 2>/dev/null | \
+openssl s_client -connect localhost:4430 -showcerts </dev/null 2>/dev/null | \
   grep -E 'BEGIN|END' -A 100 | \
   wc -c
 ```
@@ -332,7 +349,8 @@ openssl s_client -connect localhost:443 -showcerts </dev/null 2>/dev/null | \
 ### Server Response
 
 ```bash
-ab -n 100 -c 10 -t 10 https://localhost/ 2>&1 | grep "Requests per second"
+ab -n 100 -c 10 -t 10 https://localhost:4430/ 2>&1 | grep "Requests per second"
+ab -n 100 -c 10 -t 10 https://localhost:4431/ 2>&1 | grep "Requests per second"
 ```
 
 **Expected:** 1000-5000 requests/second (varies by hardware)
@@ -346,11 +364,14 @@ ab -n 100 -c 10 -t 10 https://localhost/ 2>&1 | grep "Requests per second"
 Before proceeding to Lab 01, ensure:
 
 - [ ] Containers are running (`docker ps`)
-- [ ] Can access https://localhost in browser
-- [ ] `curl -k https://localhost` returns HTML
-- [ ] OpenSSL shows TLS 1.2 and ECDHE-RSA cipher
+- [ ] Can access `https://localhost:4430` (vulnerable) in browser
+- [ ] Can access `https://localhost:4431` (secure) in browser
+- [ ] `curl -k https://localhost:4430` returns HTML
+- [ ] `curl -k https://localhost:4431` returns HTML
+- [ ] Vulnerable: OpenSSL shows TLS 1.0/1.1/1.2 available, 3DES in cipher list
+- [ ] Secure: OpenSSL shows TLS 1.3, AEAD only
 - [ ] Certificate is RSA-2048 (`openssl x509 -in certs/server.crt -text | grep "Public-Key"`)
-- [ ] No errors in NGINX logs (`docker logs pqc-target-nginx`)
+- [ ] No errors in NGINX logs (`docker logs pqc-nginx-vulnerable` / `docker logs pqc-nginx-secure`)
 
 ---
 
@@ -364,7 +385,8 @@ docker-compose up -d
 docker-compose down
 
 # View logs
-docker logs pqc-target-nginx
+docker logs pqc-nginx-vulnerable
+docker logs pqc-nginx-secure
 docker logs pqc-target-mysql
 
 # Restart services
@@ -374,38 +396,39 @@ docker-compose restart
 docker-compose up -d --build
 
 # Shell into container
-docker exec -it pqc-target-nginx bash
+docker exec -it pqc-nginx-vulnerable bash
+docker exec -it pqc-nginx-secure bash
 
 # Check NGINX config
-docker exec pqc-target-nginx nginx -t
+docker exec pqc-nginx-vulnerable nginx -t
+docker exec pqc-nginx-secure nginx -t
 ```
 
 ---
 
 ## 🐛 Troubleshooting | แก้ไขปัญหา
 
-### Issue: "Port 443 already in use"
+### Issue: "Port 4430 or 4431 already in use"
 
 ```bash
-# Find what's using port 443
-sudo lsof -i :443
+# Find what's using port 4430 or 4431
+sudo lsof -i :4430
+sudo lsof -i :4431
 
-# Stop Apache if running
-sudo systemctl stop apache2
-
-# Or change docker-compose.yml port mapping:
+# Stop the conflicting process, or change port mapping in docker-compose.yml:
 ports:
-  - "8443:443"  # Use port 8443 instead
+  - "4432:443"  # Use a different host port
 ```
 
-### Issue: "Cannot connect to https://localhost"
+### Issue: "Cannot connect to https://localhost:4430 or :4431"
 
 ```bash
 # Check container status
 docker ps
 
 # Check logs
-docker logs pqc-target-nginx
+docker logs pqc-nginx-vulnerable
+docker logs pqc-nginx-secure
 
 # Restart
 docker-compose restart
@@ -463,7 +486,7 @@ docker-compose down
 docker-compose down -v
 
 # Remove images (optional)
-docker rmi pqc-target-nginx mysql:5.7
+docker rmi 00-target-app-pqc-nginx-vulnerable 00-target-app-pqc-nginx-secure mysql:5.7
 ```
 
 **Note:** Don't run cleanup until you finish all labs!

@@ -84,8 +84,16 @@ Now that you understand the concepts, let's scan the target application!
 
 **Goal:** Connect to the server and see the raw TLS handshake
 
+> ⚠️ **Port reference:** Lab 00 now uses two separate servers:
+> - **Port 4430** → Vulnerable (TLS 1.0/1.1, 3DES, DH-1024) — PRIMARY SCAN TARGET
+> - **Port 4431** → Secure (TLS 1.3, AEAD only) — for comparison
+
 ```bash
-openssl s_client -connect localhost:443 -brief
+# Scan vulnerable server (main target for this lab)
+openssl s_client -connect localhost:4430 -tls1_2 -cipher 'ECDHE-RSA-AES256-GCM-SHA384@SECLEVEL=1' -brief
+
+# Compare with secure server
+openssl s_client -connect localhost:4431 -brief
 ```
 
 **What to look for:**
@@ -98,9 +106,10 @@ openssl s_client -connect localhost:443 -brief
 ### Step 2.2: Inspect Certificate Details
 
 ```bash
-# Method 1: Through connection
-openssl s_client -connect localhost:443 -showcerts </dev/null 2>/dev/null | \
-  openssl x509 -text -noout
+# Method 1: Through connection (vulnerable server, SECLEVEL=1 needed for DH-1024)
+openssl s_client -connect localhost:4430 -tls1_2 \
+  -cipher 'ECDHE-RSA-AES256-GCM-SHA384@SECLEVEL=1' \
+  -showcerts </dev/null 2>/dev/null | openssl x509 -text -noout
 
 # Method 2: Direct file inspection (if you have access)
 openssl x509 -in ../00-target-app/certs/server.crt -text -noout
@@ -118,12 +127,15 @@ Find and record:
 ### Step 2.3: Enumerate Cipher Suites
 
 ```bash
-# Test specific ciphers manually
-openssl s_client -connect localhost:443 -cipher 'ECDHE-RSA-AES256-GCM-SHA384' -brief
+# Test specific ciphers manually (vulnerable server - SECLEVEL=1 for DH-1024)
+openssl s_client -connect localhost:4430 -cipher 'ECDHE-RSA-AES256-GCM-SHA384@SECLEVEL=1' -tls1_2 -brief
 
-# Try different TLS versions
-openssl s_client -connect localhost:443 -tls1_2 -brief
-openssl s_client -connect localhost:443 -tls1_3 -brief
+# Test 3DES (SWEET32 vulnerability)
+openssl s_client -connect localhost:4430 -cipher 'DES-CBC3-SHA@SECLEVEL=0' -tls1_2 -brief
+
+# Try different TLS versions on vulnerable server (TLS 1.0 may not work from modern host)
+openssl s_client -connect localhost:4430 -tls1_2 -cipher '@SECLEVEL=1' -brief
+openssl s_client -connect localhost:4431 -tls1_3 -brief  # Secure server
 ```
 
 **Fill in the worksheet:** [worksheets/cipher-enumeration.md](worksheets/cipher-enumeration.md)
@@ -139,8 +151,11 @@ cd tools
 # Clone testssl.sh (if not already there)
 git clone --depth 1 https://github.com/drwetter/testssl.sh.git
 
-# Run scan
-./testssl.sh/testssl.sh localhost:443
+# Scan vulnerable server (Grade F expected)
+./testssl.sh/testssl.sh localhost:4430
+
+# Scan secure server for comparison (Grade A expected)
+./testssl.sh/testssl.sh localhost:4431
 ```
 
 **This will take 2-3 minutes** and produce a comprehensive report.
@@ -269,7 +284,7 @@ This installs:
 
 Run this command:
 ```bash
-openssl s_client -connect localhost:443 -brief
+openssl s_client -connect localhost:4430 -tls1_2 -cipher 'ECDHE-RSA-AES256-GCM-SHA384@SECLEVEL=1' -brief
 ```
 
 **Question:** What key exchange algorithm is used? (Hint: Look for "ECDHE" or "RSA")
@@ -280,8 +295,10 @@ openssl s_client -connect localhost:443 -brief
 **Time:** 5 minutes
 
 ```bash
-# Get certificate
-openssl s_client -connect localhost:443 -showcerts </dev/null 2>/dev/null | \
+# Get certificate (vulnerable server)
+openssl s_client -connect localhost:4430 -tls1_2 \
+  -cipher 'ECDHE-RSA-AES256-GCM-SHA384@SECLEVEL=1' \
+  -showcerts </dev/null 2>/dev/null | \
   sed -n '/BEGIN CERTIFICATE/,/END CERTIFICATE/p' > /tmp/cert.pem
 
 # Check size

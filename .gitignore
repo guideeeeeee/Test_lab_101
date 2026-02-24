@@ -242,6 +242,9 @@ labs/06-vpn-hybrid/*.pcap
 labs/07-advanced-workshop/solutions/
 labs/08-compliance-mapping/filled-checklists/
 
+
+LAB-INSPECTION-REPORT.md
+.env-info
 # ================================================================
 # Keep Structure Placeholders
 # ================================================================

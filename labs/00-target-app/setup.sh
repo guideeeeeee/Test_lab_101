@@ -80,13 +80,18 @@ if [ ! -f dhparam.pem ]; then
     openssl dhparam -out dhparam.pem 2048 2>/dev/null
 fi
 
-cd ..
-print_success "Certificates generated (RSA-2048)"
+# Generate DH parameters (1024-bit for vulnerable demo)
+if [ ! -f dhparam-1024.pem ]; then
+    openssl dhparam -out dhparam-1024.pem 1024 2>/dev/null
+fi
 
-# Step 3: Build NGINX container
-print_step 3 6 "Building NGINX container..."
-$DOCKER_COMPOSE build --quiet nginx
-print_success "NGINX container built"
+cd ..
+print_success "Certificates generated (RSA-2048 + DH-2048 + DH-1024)"
+
+# Step 3: Build NGINX containers
+print_step 3 6 "Building NGINX containers (vulnerable + secure)..."
+$DOCKER_COMPOSE build --quiet pqc-nginx-vulnerable pqc-nginx-secure
+print_success "NGINX containers built"
 
 # Step 4: Start MySQL database
 print_step 4 6 "Starting MySQL database..."
@@ -102,19 +107,25 @@ for i in {1..15}; do
 done
 print_success "MySQL database started"
 
-# Step 5: Start NGINX server
-print_step 5 6 "Starting NGINX server..."
-$DOCKER_COMPOSE up -d nginx
+# Step 5: Start NGINX servers (vulnerable + secure)
+print_step 5 6 "Starting NGINX servers (vulnerable: 4430 | secure: 4431)..."
+$DOCKER_COMPOSE up -d pqc-nginx-vulnerable pqc-nginx-secure
 sleep 2
-print_success "NGINX server started"
+print_success "NGINX servers started"
 
 # Step 6: Verify deployment
 print_step 6 6 "Verifying deployment..."
 
 # Check if containers are running
-if ! docker ps | grep -q pqc-target-nginx; then
-    print_error "NGINX container is not running"
-    echo "Check logs with: docker logs pqc-target-nginx"
+if ! docker ps | grep -q pqc-nginx-vulnerable; then
+    print_error "Vulnerable NGINX container is not running"
+    echo "Check logs with: docker logs pqc-nginx-vulnerable"
+    exit 1
+fi
+
+if ! docker ps | grep -q pqc-nginx-secure; then
+    print_error "Secure NGINX container is not running"
+    echo "Check logs with: docker logs pqc-nginx-secure"
     exit 1
 fi
 
@@ -124,36 +135,48 @@ if ! docker ps | grep -q pqc-target-mysql; then
     exit 1
 fi
 
-# Test HTTPS connection
-if curl -k -s -o /dev/null -w "%{http_code}" https://localhost | grep -q "200"; then
-    HTTP_CODE="200 OK"
+# Test HTTPS connections
+if curl -k -s -o /dev/null -w "%{http_code}" https://localhost:4430 | grep -q "200"; then
+    HTTP_VULN="200 OK"
 else
-    HTTP_CODE="Failed"
+    HTTP_VULN="Failed"
 fi
 
-# Check TLS version and cipher
-TLS_INFO=$(openssl s_client -connect localhost:443 -brief </dev/null 2>&1 | grep -E "Protocol|Ciphersuite" || echo "Unable to connect")
+if curl -k -s -o /dev/null -w "%{http_code}" https://localhost:4431 | grep -q "200"; then
+    HTTP_SEC="200 OK"
+else
+    HTTP_SEC="Failed"
+fi
+
+# Check TLS version and cipher on vulnerable
+TLS_VULN=$(openssl s_client -connect localhost:4430 -brief </dev/null 2>&1 | grep -E "Protocol|Ciphersuite" || echo "Unable to connect")
+
+# Check TLS version and cipher on secure
+TLS_SEC=$(openssl s_client -connect localhost:4431 -brief </dev/null 2>&1 | grep -E "Protocol|Ciphersuite" || echo "Unable to connect")
 
 print_success "Deployment verified"
 
 # Summary
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo -e "${GREEN}✅ Target application is running!${NC}"
+echo -e "${GREEN}✅ Target applications are running!${NC}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
-echo "  URL: https://localhost"
-echo "  Status: $HTTP_CODE"
+echo "  [VULNERABLE] https://localhost:4430  →  Status: $HTTP_VULN"
+echo "  $TLS_VULN"
 echo ""
-echo "$TLS_INFO"
+echo "  [SECURE]     https://localhost:4431  →  Status: $HTTP_SEC"
+echo "  $TLS_SEC"
 echo ""
 echo "Next steps:"
-echo "  1. Open browser: https://localhost"
-echo "  2. Test CLI: curl -k https://localhost"
-echo "  3. Check TLS: openssl s_client -connect localhost:443"
+echo "  1. Vulnerable: curl -k https://localhost:4430"
+echo "  2. Secure:     curl -k https://localhost:4431"
+echo "  3. Compare TLS: openssl s_client -connect localhost:4430 -brief"
+echo "                  openssl s_client -connect localhost:4431 -brief"
 echo ""
 echo "Container management:"
-echo "  • View logs: docker logs pqc-target-nginx"
+echo "  • Vulnerable logs: docker logs pqc-nginx-vulnerable"
+echo "  • Secure logs:     docker logs pqc-nginx-secure"
 echo "  • Stop: docker-compose down"
 echo "  • Restart: docker-compose restart"
 echo ""

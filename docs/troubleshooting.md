@@ -156,6 +156,108 @@ openssl s_client -connect localhost:443 -tls1_3
 
 ---
 
+### Issue: "DH key too small" (OpenSSL 3.x)
+
+**Symptom:**
+```
+error:0A00018E:SSL routines::dh key too small
+error:1408518A:SSL routines:ssl3_ctx_ctrl:dh key too small
+```
+
+**Cause:** 
+OpenSSL 3.x enforces minimum key sizes by default (security level 2):
+- Minimum 2048-bit for RSA/DH
+- Rejects 1024-bit DH parameters
+
+**Context:**
+This error typically occurs when trying to demonstrate **vulnerable configurations** 
+(like those found in real servers) that use weak cryptographic parameters.
+
+**Solutions:**
+
+**Option 1: Lower Security Level (For Lab ONLY)** ⭐ Recommended for Vulnerable Demo
+
+```nginx
+# In NGINX ssl-params.conf
+# Add @SECLEVEL=1 to the end of cipher string
+
+ssl_ciphers 'DHE-RSA-AES256-SHA:AES256-SHA:DES-CBC3-SHA@SECLEVEL=1';
+#                                                        ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
+#                                                     This allows 1024-bit DH
+
+# Or for more control
+ssl_conf_command Ciphersuites DEFAULT@SECLEVEL=1;
+```
+
+**Option 2: Use Stronger DH Parameters** ⭐ Recommended for Production
+
+```bash
+# Generate 2048-bit DH (passes security check)
+openssl dhparam -out dhparam.pem 2048
+
+# Update NGINX config
+ssl_dhparam /etc/nginx/certs/dhparam.pem;
+
+# No @SECLEVEL needed - uses default (2)
+```
+
+**Option 3: Use OpenSSL Config File**
+
+```bash
+# Create /etc/ssl/openssl-lab.cnf
+cat > /etc/ssl/openssl-lab.cnf <<EOF
+openssl_conf = openssl_init
+
+[openssl_init]
+ssl_conf = ssl_sect
+
+[ssl_sect]
+system_default = system_default_sect
+
+[system_default_sect]
+CipherString = DEFAULT:@SECLEVEL=1
+MinProtocol = TLSv1
+EOF
+
+# Set environment variable
+export OPENSSL_CONF=/etc/ssl/openssl-lab.cnf
+
+# Or in Dockerfile
+ENV OPENSSL_CONF=/etc/ssl/openssl-lab.cnf
+```
+
+**Verify Fix:**
+
+```bash
+# Test NGINX configuration
+nginx -t
+
+# Test connection
+openssl s_client -connect localhost:443 -brief
+
+# Check what security level is active
+openssl s_client -connect localhost:443 -showcerts 2>&1 | grep -i "cipher\|security"
+```
+
+**⚠️ Important Notes:**
+
+- **NEVER use @SECLEVEL=1 or 0 in production!**
+- This is ONLY for educational labs demonstrating vulnerabilities
+- For secure configurations, always use 2048-bit (or higher) DH parameters
+- Document clearly why security level was lowered
+
+**Educational Value:**
+
+This error demonstrates:
+1. Modern OpenSSL actively protects against weak cryptography
+2. Why old configurations fail on new systems
+3. The real-world challenge of maintaining legacy systems
+4. Security vs. compatibility trade-offs
+
+📖 **Further Reading:** [docs/openssl-security-levels.md](openssl-security-levels.md)
+
+---
+
 ## 🐍 Python Issues
 
 ### Issue: "ModuleNotFoundError: No module named 'matplotlib'"
