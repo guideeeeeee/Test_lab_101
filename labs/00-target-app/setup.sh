@@ -136,7 +136,8 @@ if ! docker ps | grep -q pqc-target-mysql; then
 fi
 
 # Test HTTPS connections
-if curl -k -s -o /dev/null -w "%{http_code}" https://localhost:4430 | grep -q "200"; then
+# Note: --ciphers DEFAULT@SECLEVEL=1 required for 1024-bit DH on OpenSSL 3.x
+if curl -k -s --ciphers DEFAULT@SECLEVEL=1 -o /dev/null -w "%{http_code}" https://localhost:4430 | grep -q "200"; then
     HTTP_VULN="200 OK"
 else
     HTTP_VULN="Failed"
@@ -149,7 +150,8 @@ else
 fi
 
 # Check TLS version and cipher on vulnerable
-TLS_VULN=$(openssl s_client -connect localhost:4430 -brief </dev/null 2>&1 | grep -E "Protocol|Ciphersuite" || echo "Unable to connect")
+# Note: -cipher @SECLEVEL=1 required for 1024-bit DH on OpenSSL 3.x
+TLS_VULN=$(openssl s_client -connect localhost:4430 -cipher 'DEFAULT@SECLEVEL=1' -brief </dev/null 2>&1 | grep -E "Protocol|Ciphersuite" || echo "Unable to connect")
 
 # Check TLS version and cipher on secure
 TLS_SEC=$(openssl s_client -connect localhost:4431 -brief </dev/null 2>&1 | grep -E "Protocol|Ciphersuite" || echo "Unable to connect")
@@ -169,7 +171,7 @@ echo "  [SECURE]     https://localhost:4431  →  Status: $HTTP_SEC"
 echo "  $TLS_SEC"
 echo ""
 echo "Next steps:"
-echo "  1. Vulnerable: curl -k https://localhost:4430"
+echo "  1. Vulnerable: curl -k --ciphers DEFAULT@SECLEVEL=1 https://localhost:4430"
 echo "  2. Secure:     curl -k https://localhost:4431"
 echo "  3. Compare TLS: openssl s_client -connect localhost:4430 -brief"
 echo "                  openssl s_client -connect localhost:4431 -brief"

@@ -44,12 +44,12 @@ After this lab, you will be able to:
 
 ```
 ┌──────────────────────────────────────────────┐
-│   Docker Containers (docker-compose)          │
+│   Docker Containers (docker-compose)         │
 │                                              │
 │   ┌──────────────────────────────────────┐   │
 │   │  pqc-nginx-vulnerable  (port 4430)   │   │
 │   │                                      │   │
-│   │  ├── TLS 1.0 / 1.1 / 1.2            │   │
+│   │  ├── TLS 1.0 / 1.1 / 1.2             │   │
 │   │  ├── 3DES, CBC ciphers               │   │
 │   │  ├── DH-1024 bit                     │   │
 │   │  └── Mimics Supreme.swu.ac.th        │   │
@@ -58,14 +58,14 @@ After this lab, you will be able to:
 │   ┌──────────────────────────────────────┐   │
 │   │  pqc-nginx-secure      (port 4431)   │   │
 │   │                                      │   │
-│   │  ├── TLS 1.3 + TLS 1.2 only         │   │
+│   │  ├── TLS 1.3 + TLS 1.2 only          │   │
 │   │  ├── AEAD ciphers only               │   │
 │   │  ├── HSTS enabled                    │   │
 │   │  └── Hardened 2026 baseline          │   │
 │   └──────────────────────────────────────┘   │
 │                                              │
-│   MySQL 5.7 Database                          │
-│   (shared backend for both servers)           │
+│   MySQL 5.7 Database                         │
+│   (shared backend for both servers)          │
 └──────────────────────────────────────────────┘
          │
          │ Port 4430 (HTTPS - Vulnerable)
@@ -177,7 +177,7 @@ You should see a **corporate website** with navigation menu.
 
 ```bash
 # Vulnerable server
-curl -k https://localhost:4430
+curl -k --ciphers DEFAULT@SECLEVEL=1 https://localhost:4430
 
 # Secure server
 curl -k https://localhost:4431
@@ -189,10 +189,10 @@ curl -k https://localhost:4431
 
 ```bash
 # Vulnerable server (expects TLS 1.0/1.1/1.2 + weak ciphers)
-openssl s_client -connect localhost:4430 -brief
+openssl s_client -connect localhost:4430 -cipher 'DEFAULT@SECLEVEL=1' -brief </dev/null 2>&1
 
 # Secure server (expects TLS 1.3 + AEAD only)
-openssl s_client -connect localhost:4431 -brief
+openssl s_client -connect localhost:4431 -brief </dev/null 2>&1
 ```
 
 **Vulnerable expected output:**
