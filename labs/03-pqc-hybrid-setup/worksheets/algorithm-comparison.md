@@ -27,8 +27,16 @@ Test and compare different post-quantum cryptography algorithms to understand th
 
 ### Test Command Template
 
+> ⚠️ ต้องรันผ่าน `docker exec` — host openssl ไม่รองรับ PQC signature
+
 ```bash
-time openssl s_client -connect localhost:8443 -groups [ALGORITHM] -brief
+docker exec pqc-hybrid-nginx sh -c '
+OPENSSL_CONF=/opt/openssl/ssl/openssl.cnf \
+LD_LIBRARY_PATH=/opt/openssl/lib64:/opt/oqs/lib \
+time /opt/openssl/bin/openssl s_client \
+  -connect localhost:443 \
+  -groups [ALGORITHM] \
+  -brief </dev/null 2>&1'
 ```
 
 ### Results Table
@@ -69,7 +77,10 @@ Overhead: _______% increase
 ### Test Command Template
 
 ```bash
-openssl s_client -connect localhost:8443 -sigalgs [ALGORITHM] -showcerts | grep "Signature Algorithm"
+docker exec pqc-hybrid-nginx sh -c '
+OPENSSL_CONF=/opt/openssl/ssl/openssl.cnf \
+LD_LIBRARY_PATH=/opt/openssl/lib64:/opt/oqs/lib \
+/opt/openssl/bin/openssl s_client -connect localhost:443 -showcerts </dev/null 2>/dev/null' | grep "Signature Algorithm"
 ```
 
 ### Certificate Information
@@ -104,7 +115,10 @@ ls -lh /path/to/certs-hybrid/*.crt
 ### Test Command
 
 ```bash
-openssl s_client -connect localhost:8443 -cipher [CIPHER_SUITE]
+docker exec pqc-hybrid-nginx sh -c '
+OPENSSL_CONF=/opt/openssl/ssl/openssl.cnf \
+LD_LIBRARY_PATH=/opt/openssl/lib64:/opt/oqs/lib \
+/opt/openssl/bin/openssl s_client -connect localhost:443 -cipher [CIPHER_SUITE] -brief </dev/null 2>&1'
 ```
 
 ### Results
@@ -148,9 +162,12 @@ openssl s_client -connect localhost:8443 -cipher [CIPHER_SUITE]
 ### Handshake Performance
 
 ```bash
-# Test 100 handshakes
+# Test 100 handshakes (รันภายใน container)
 for i in {1..100}; do
-  time openssl s_client -connect localhost:8443 -groups [ALGORITHM] -brief < /dev/null
+  docker exec pqc-hybrid-nginx sh -c '
+  OPENSSL_CONF=/opt/openssl/ssl/openssl.cnf \
+  LD_LIBRARY_PATH=/opt/openssl/lib64:/opt/oqs/lib \
+  time /opt/openssl/bin/openssl s_client -connect localhost:443 -groups [ALGORITHM] -brief </dev/null 2>&1'
 done 2>&1 | grep real | awk '{sum+=$2; count++} END {print sum/count}'
 ```
 

@@ -22,7 +22,7 @@ cd labs/03-pqc-hybrid-setup
 #    - เริ่ม NGINX ด้วย PQC hybrid TLS
 
 # 3. ทดสอบ
-curl -k https://localhost:8443
+docker exec pqc-hybrid-nginx curl -k -s -o /dev/null -w "%{http_code}" https://localhost/
 ```
 
 ---
@@ -67,27 +67,34 @@ docker compose -f docker-compose-hybrid.yml exec nginx-pqc-hybrid \
 
 ## 🧪 ทดสอบ PQC Connection
 
-### ทดสอบจาก Host
+### ⚠️ ทดสอบจาก Host ไม่ได้ด้วย curl/openssl ปกติ
+
+Host curl/openssl **ไม่รองรับ** PQC signature algorithm (`p384_mldsa65`) ที่ใช้ใน server certificate
+→ จะได้ error `SSL routines::unknown certificate type` หรือ exit code 35
 
 ```bash
-# ทดสอบด้วย curl
-curl -k -v https://localhost:8443
-
-# ดู TLS handshake details
-openssl s_client -connect localhost:8443 -showcerts < /dev/null
+# ❌ ไม่ได้ - host OpenSSL ไม่รู้จัก p384_mldsa65
+curl -k https://localhost:8443
+openssl s_client -connect localhost:8443
 ```
 
-### ทดสอบจากภายใน Container (PQC-enabled OpenSSL)
+### ✅ ทดสอบผ่าน docker exec (OQS-enabled OpenSSL)
 
 ```bash
-# เข้า container
-docker compose -f docker-compose-hybrid.yml exec nginx-pqc-hybrid bash
+# วิธีที่ 1: curl ภายใน container
+docker exec pqc-hybrid-nginx curl -k -s -o /dev/null -w "%{http_code}" https://localhost/
 
-# ทดสอบด้วย OQS-enabled OpenSSL
+# วิธีที่ 2: openssl s_client พร้อม OQS provider (ดู TLS handshake ละเอียด)
+docker exec pqc-hybrid-nginx sh -c '
+OPENSSL_CONF=/opt/openssl/ssl/openssl.cnf \
+LD_LIBRARY_PATH=/opt/openssl/lib64:/opt/oqs/lib \
 /opt/openssl/bin/openssl s_client \
   -connect localhost:443 \
-  -showcerts \
-  < /dev/null
+  -groups mlkem768:p384_mlkem768:X25519 \
+  -brief </dev/null 2>&1'
+
+# วิธีที่ 3: เข้า shell ใน container แล้วรันเอง
+docker exec -it pqc-hybrid-nginx sh
 ```
 
 ---

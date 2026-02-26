@@ -286,38 +286,57 @@ docker logs pqc-hybrid-nginx
 
 ### Step 5.1: Test with OpenSSL Client
 
+> ⚠️ **Host openssl ไม่รองรับ PQC** — ต้องรันผ่าน `docker exec` เท่านั้น
+
 ```bash
 # Test hybrid connection
-openssl s_client -connect localhost:8443 -groups x25519_kyber768:X25519
+docker exec pqc-hybrid-nginx sh -c '
+OPENSSL_CONF=/opt/openssl/ssl/openssl.cnf \
+LD_LIBRARY_PATH=/opt/openssl/lib64:/opt/oqs/lib \
+/opt/openssl/bin/openssl s_client \
+  -connect localhost:443 \
+  -groups mlkem768:p384_mlkem768:X25519 \
+  -brief </dev/null 2>&1'
 
 # Look for:
-# - Protocol: TLSv1.3
-# - Cipher: TLS_AES_256_GCM_SHA384
-# - Group: x25519_kyber768 (hybrid!)
-# - Certificate: mldsa65 or ecdsa
+# Protocol: TLSv1.3
+# Cipher: TLS_AES_256_GCM_SHA384
+# Signature type: p384_mldsa65 (PQC hybrid!)
 ```
 
 ### Step 5.2: Test Algorithm Negotiation
 
 ```bash
-# Test 1: Force X25519 only (classical)
-openssl s_client -connect localhost:8443 -groups X25519
+# Test 1: Force X25519 only (classical key exchange)
+docker exec pqc-hybrid-nginx sh -c '
+OPENSSL_CONF=/opt/openssl/ssl/openssl.cnf \
+LD_LIBRARY_PATH=/opt/openssl/lib64:/opt/oqs/lib \
+/opt/openssl/bin/openssl s_client -connect localhost:443 -groups X25519 -brief </dev/null 2>&1'
 
-# Test 2: Request Kyber768 hybrid
-openssl s_client -connect localhost:8443 -groups x25519_kyber768
+# Test 2: Request ML-KEM768 hybrid
+docker exec pqc-hybrid-nginx sh -c '
+OPENSSL_CONF=/opt/openssl/ssl/openssl.cnf \
+LD_LIBRARY_PATH=/opt/openssl/lib64:/opt/oqs/lib \
+/opt/openssl/bin/openssl s_client -connect localhost:443 -groups mlkem768:p384_mlkem768 -brief </dev/null 2>&1'
 
-# Test 3: Pure Kyber (if supported)
-openssl s_client -connect localhost:8443 -groups kyber768
+# Test 3: Pure ML-KEM (if supported)
+docker exec pqc-hybrid-nginx sh -c '
+OPENSSL_CONF=/opt/openssl/ssl/openssl.cnf \
+LD_LIBRARY_PATH=/opt/openssl/lib64:/opt/oqs/lib \
+/opt/openssl/bin/openssl s_client -connect localhost:443 -groups mlkem768 -brief </dev/null 2>&1'
 ```
 
 ### Step 5.3: Verify Certificate
 
 ```bash
 # Check which certificate is served
-openssl s_client -connect localhost:8443 -showcerts | grep "Subject:"
+docker exec pqc-hybrid-nginx sh -c '
+OPENSSL_CONF=/opt/openssl/ssl/openssl.cnf \
+LD_LIBRARY_PATH=/opt/openssl/lib64:/opt/oqs/lib \
+/opt/openssl/bin/openssl s_client -connect localhost:443 -showcerts </dev/null 2>/dev/null' | grep "Subject:"
 
 # Compare certificate sizes
-ls -lh certs/hybrid-*.crt
+docker exec pqc-hybrid-nginx ls -lh /etc/nginx/certs/
 ```
 
 ---
@@ -452,12 +471,20 @@ docker compose -f docker-compose-hybrid.yml exec nginx-pqc-hybrid \
 export LD_LIBRARY_PATH=/path/to/openssl-oqs/lib:$LD_LIBRARY_PATH
 ```
 
-### Issue: Certificate validation failed
+### Issue: Certificate validation failed / curl exit code 35
 
 ```bash
-# Use self-signed CA for testing
-# Add -CAfile flag or use -k with curl
-curl -k https://localhost:8443
+# ❌ Host curl ไม่ได้ - server cert ใช้ p384_mldsa65 ที่ host OpenSSL ไม่รองรับ
+# curl -k https://localhost:8443  → SSL error
+
+# ✅ ใช้ curl ภายใน container แทน
+docker exec pqc-hybrid-nginx curl -k -s -o /dev/null -w "%{http_code}" https://localhost/
+
+# ✅ หรือ openssl s_client ด้วย OQS provider
+docker exec pqc-hybrid-nginx sh -c '
+OPENSSL_CONF=/opt/openssl/ssl/openssl.cnf \
+LD_LIBRARY_PATH=/opt/openssl/lib64:/opt/oqs/lib \
+/opt/openssl/bin/openssl s_client -connect localhost:443 -brief </dev/null 2>&1'
 ```
 
 ### Issue: NGINX won't start

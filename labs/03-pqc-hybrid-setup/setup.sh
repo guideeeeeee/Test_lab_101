@@ -122,8 +122,8 @@ if [ ! -f "www/index.html" ]; then
         </ul>
         
         <h2>🔍 Verify Your Connection</h2>
-        <p>Check TLS details with:</p>
-        <pre style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; overflow-x: auto;">openssl s_client -connect localhost:8443 -showcerts</pre>
+        <p>Check TLS details with (run from host terminal):</p>
+        <pre style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; overflow-x: auto;">docker exec pqc-hybrid-nginx sh -c 'OPENSSL_CONF=/opt/openssl/ssl/openssl.cnf LD_LIBRARY_PATH=/opt/openssl/lib64:/opt/oqs/lib /opt/openssl/bin/openssl s_client -connect localhost:443 -brief &lt;/dev/null 2&gt;&amp;1'</pre>
         
         <p><a href="/tls-info">📊 View TLS Connection Info (JSON)</a></p>
         
@@ -205,13 +205,9 @@ else
     exit 1
 fi
 
-if docker ps | grep -q "pqc-hybrid-mysql"; then
-    echo "✓ MySQL container is running"
-else
-    echo "✗ MySQL container failed to start"
-    echo "Check logs: docker logs pqc-hybrid-mysql"
-    exit 1
-fi
+# Note: docker-compose-hybrid.yml does not include MySQL.
+# MySQL is only in docker-compose.yml (full stack).
+# This lab only requires the PQC NGINX container.
 
 echo ""
 echo "=================================="
@@ -222,8 +218,11 @@ echo "Access the server:"
 echo "  HTTPS: https://localhost:8443"
 echo "  HTTP:  http://localhost:8080 (redirects to HTTPS)"
 echo ""
-echo "Verify TLS connection:"
-echo "  openssl s_client -connect localhost:8443 -showcerts"
+echo "Verify TLS connection (use docker exec - host OpenSSL does not support PQC):"
+echo "  docker exec pqc-hybrid-nginx sh -c '"
+echo "  OPENSSL_CONF=/opt/openssl/ssl/openssl.cnf \\"
+echo "  LD_LIBRARY_PATH=/opt/openssl/lib64:/opt/oqs/lib \\"
+echo "  /opt/openssl/bin/openssl s_client -connect localhost:443 -brief </dev/null 2>&1'"
 echo ""
 echo "Check logs:"
 echo "  docker logs pqc-hybrid-nginx"

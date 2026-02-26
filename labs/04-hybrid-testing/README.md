@@ -44,13 +44,13 @@ We'll measure:
 ### Exactly Like Lab 02
 
 ```bash
-# Single measurement with curl
-curl -k -o /dev/null -s -w "Handshake: %{time_connect}s\nTotal: %{time_total}s\n" https://localhost:8443
+# Single measurement with curl in container
+docker exec pqc-hybrid-nginx curl -k -o /dev/null -s -w "Handshake: %{time_connect}s\nTotal: %{time_total}s\n" https://localhost
 
 # Run 20 times
 for i in {1..20}; do
-  curl -k -o /dev/null -s -w "%{time_connect}\n" https://localhost:8443
-done > handshake_times_hybrid.txt
+  docker exec pqc-hybrid-nginx curl -k -o /dev/null -s -w "%{time_connect}\n" https://localhost 
+done > results/handshake_times_hybrid.txt
 ```
 
 ### Record in Worksheet
@@ -76,18 +76,27 @@ awk '{ total += $1; count++ } END { print total/count }' handshake_times_hybrid.
 
 ## 💻 Step 2: CPU & Memory Usage (15 min)
 
-### Same Monitoring, Different Container
 
+**Terminal 1: Start monitoring (บันทึกต่อเนื่องทุก 2 วินาที)**
 ```bash
-# Monitor hybrid NGINX CPU usage
-docker stats pqc-hybrid-nginx --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}"
+# บันทึก CPU + Memory ลงไฟล์ + แสดงบน terminal พร้อมกัน
+# กด Ctrl+C เพื่อหยุด
+while true; do
+  echo -n "$(date '+%H:%M:%S') | " | tee -a results/cpu-memory-log.txt
+  docker stats pqc-hybrid-nginx --no-stream \
+    --format "{{.CPUPerc}}\t{{.MemUsage}}" | tee -a results/cpu-memory-log.txt
+  sleep 2
+done
 ```
+
 
 ### Generate Load
 
 ```bash
-# Same load as Lab 02
-ab -n 100 -c 10 https://localhost:8443/
+# ab ไม่รองรับ TLS 1.3 — ใช้ openssl s_time จาก OQS build ใน container แทน
+docker exec pqc-hybrid-nginx /opt/openssl/bin/openssl s_time \
+  -connect localhost:443 -CAfile /etc/nginx/certs/ca-hybrid.crt \
+  -new -time 30 -www "/"
 ```
 
 **Record:**
@@ -107,24 +116,33 @@ During load:
 
 ## 📈 Step 3: Throughput Testing (15 min)
 
-### Apache Bench - Same Tests
+### Throughput Tests
+
+> **หมายเหตุ:** `ab` รองรับแค่ TLS 1.2 ลงไป แต่ nginx ตั้งค่าเป็น TLS 1.3 only
+> ใช้ `openssl s_time` จาก OQS build ใน container แทน ซึ่งรองรับ TLS 1.3 + PQC เต็มรูปแบบ
 
 ```bash
-# Test 1
-ab -n 1000 -c 10 https://localhost:8443/ 2>&1 | tee ab-hybrid-test1.txt
+# Test 1: New handshake ทุกครั้ง (30 วินาที)
+docker exec pqc-hybrid-nginx /opt/openssl/bin/openssl s_time \
+  -connect localhost:443 -CAfile /etc/nginx/certs/ca-hybrid.crt \
+  -new -time 30 -www "/" 2>&1 | tee results/ab-hybrid-test1.txt
 
-# Test 2
-ab -n 5000 -c 50 https://localhost:8443/ 2>&1 | tee ab-hybrid-test2.txt
+# Test 2: Session reuse (ดู keep-alive effect)
+docker exec pqc-hybrid-nginx /opt/openssl/bin/openssl s_time \
+  -connect localhost:443 -CAfile /etc/nginx/certs/ca-hybrid.crt \
+  -reuse -time 30 -www "/" 2>&1 | tee results/ab-hybrid-test2.txt
 
-# Test 3
-ab -n 10000 -c 100 https://localhost:8443/ 2>&1 | tee ab-hybrid-test3.txt
+# Test 3: Longer run สำหรับ stable measurement
+docker exec pqc-hybrid-nginx /opt/openssl/bin/openssl s_time \
+  -connect localhost:443 -CAfile /etc/nginx/certs/ca-hybrid.crt \
+  -new -time 60 -www "/" 2>&1 | tee results/ab-hybrid-test3.txt
 ```
 
 ### Extract Metrics
 
 ```bash
-grep "Requests per second" ab-hybrid-test*.txt
-grep "Time per request" ab-hybrid-test*.txt
+grep "connections/user sec" results/ab-hybrid-test*.txt
+grep "connections in" results/ab-hybrid-test*.txt
 ```
 
 **Expected:** 10-30% lower throughput due to handshake overhead
@@ -138,13 +156,15 @@ grep "Time per request" ab-hybrid-test*.txt
 ### Hybrid Certificate Size
 
 ```bash
-# Get hybrid certificate chain
-openssl s_client -connect localhost:8443 -showcerts </dev/null 2>/dev/null | \
-  sed -n '/BEGIN CERTIFICATE/,/END CERTIFICATE/p' > cert-chain-hybrid.pem
+# Get hybrid certificate chain (ใช้ OQS openssl ใน container เพราะ cert เป็น PQC hybrid)
+docker exec pqc-hybrid-nginx /opt/openssl/bin/openssl s_client \
+  -connect localhost:443 -CAfile /etc/nginx/certs/ca-hybrid.crt \
+  -showcerts </dev/null 2>/dev/null | \
+  sed -n '/BEGIN CERTIFICATE/,/END CERTIFICATE/p' > results/cert-chain-hybrid.pem
 
 # Check size
-wc -c cert-chain-hybrid.pem
-ls -lh cert-chain-hybrid.pem
+wc -c results/cert-chain-hybrid.pem
+ls -lh results/cert-chain-hybrid.pem
 ```
 
 **Record:**
@@ -157,16 +177,16 @@ ls -lh cert-chain-hybrid.pem
 ### Handshake Packet Capture
 
 ```bash
-# Capture hybrid handshake
-sudo tcpdump -i any -w handshake-hybrid.pcap 'port 8443' -c 30 &
+# Capture hybrid handshake (container port 443 mapped to host port 8443)
+sudo tcpdump -i any -w results/handshake-hybrid.pcap 'port 443 or port 8443' -c 50 &
 TCPDUMP_PID=$!
 
-curl -k https://localhost:8443 > /dev/null
+docker exec pqc-hybrid-nginx curl -k -s -o /dev/null https://localhost
 sleep 1
 sudo kill $TCPDUMP_PID
 
 # Analyze
-tcpdump -r handshake-hybrid.pcap -v | less
+tcpdump -r results/handshake-hybrid.pcap -v | less
 ```
 
 **Record total handshake size** and compare with classical
@@ -284,21 +304,25 @@ docker exec pqc-hybrid-nginx nginx -V | grep debug
 top
 ```
 
-### Issue: ab can't connect
+### Issue: ab/TLS handshake failed
 
 ```bash
-# Check if container is running
+# ab ไม่รองรับ TLS 1.3 — ใช้ openssl s_time แทน (ดู Step 3)
+# ตรวจสอบว่า container รันอยู่
 docker ps | grep pqc-hybrid-nginx
 
-# Check port 8443
-curl -k https://localhost:8443
+# ทดสอบ connection ด้วย OQS openssl
+docker exec pqc-hybrid-nginx /opt/openssl/bin/openssl s_client \
+  -connect localhost:443 -CAfile /etc/nginx/certs/ca-hybrid.crt </dev/null 2>&1 | head -20
 ```
 
 ### Issue: Certificate size seems wrong
 
 ```bash
-# Make sure you're getting PQC cert, not classical
-openssl s_client -connect localhost:8443 -showcerts | grep "Algorithm:"
+# ต้องใช้ OQS openssl เพราะ cert เป็น PQC hybrid algorithm
+docker exec pqc-hybrid-nginx /opt/openssl/bin/openssl s_client \
+  -connect localhost:443 -CAfile /etc/nginx/certs/ca-hybrid.crt \
+  -showcerts </dev/null 2>&1 | grep "sigalg:"
 ```
 
 ---

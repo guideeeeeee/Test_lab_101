@@ -11,7 +11,7 @@
 
 | Parameter | Value |
 |-----------|-------|
-| Target Server | https://localhost:443 |
+| Target Server | https://localhost:4431 |
 | TLS Version | (check with testssl.sh) |
 | Cipher Suite | (check with openssl s_client) |
 | Certificate Type | RSA-2048 |
@@ -27,7 +27,7 @@
 ```bash
 for i in {1..20}; do
   echo -n "Run $i: "
-  curl -k -o /dev/null -s -w "%{time_connect}\n" https://localhost
+  curl -k -o /dev/null -s -w "%{time_connect}\n" https://localhost:4431
 done
 ```
 
@@ -112,10 +112,7 @@ _______________________________________________________________
 
 ```bash
 # Save measurements to file
-cat handshake_times.txt | python3 ../../../scripts/calculate-stats.py --stdin
-
-# Or create JSON and use aggregate script
-python3 ../../../scripts/calculate-stats.py --input measurements.json --metric time_connect
+python3 ../../../scripts/calculate-stats.py --stdin < handshake_times_4431.txt
 ```
 
 **Results from script:**

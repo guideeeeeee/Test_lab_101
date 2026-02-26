@@ -152,10 +152,10 @@ cd tools
 git clone --depth 1 https://github.com/drwetter/testssl.sh.git
 
 # Scan vulnerable server (Grade F expected)
-./testssl.sh/testssl.sh localhost:4430
+./testssl.sh/testssl.sh --color 0 localhost:4430 | tee report4430.txt
 
 # Scan secure server for comparison (Grade A expected)
-./testssl.sh/testssl.sh localhost:4431
+./testssl.sh/testssl.sh --color 0 localhost:4431 | tee report4431.txt
 ```
 
 **This will take 2-3 minutes** and produce a comprehensive report.

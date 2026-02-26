@@ -10,7 +10,7 @@
 ## 📋 Test Configuration
 
 **Tool:** Apache Bench (ab)  
-**Target:** https://localhost:8443  
+**Target:** https://localhost:4431  
 **Test scenarios:**
 1. Low load: 100 requests, 10 concurrent  
 2. Medium load: 1,000 requests, 50 concurrent  
@@ -21,7 +21,7 @@
 ## 🚀 Test 1: Low Load
 
 ```bash
-ab -n 100 -c 10 -q https://localhost:8443/
+ab -n 100 -c 10 -k -q https://localhost:4431/
 ```
 
 **Results:**
@@ -51,7 +51,7 @@ ab -n 100 -c 10 -q https://localhost:8443/
 ## 🚀 Test 2: Medium Load
 
 ```bash
-ab -n 1000 -c 50 -q https://localhost:8443/
+ab -n 1000 -c 50 -k -q https://localhost:4431/
 ```
 
 **Results:**
@@ -81,7 +81,7 @@ ab -n 1000 -c 50 -q https://localhost:8443/
 ## 🚀 Test 3: High Load
 
 ```bash
-ab -n 10000 -c 100 -q https://localhost:8443/
+ab -n 10000 -c 100 -k -q https://localhost:4431/
 ```
 
 **Results:**
@@ -189,7 +189,7 @@ Is there a long tail? [ ] Yes (>3x median) [ ] No
 
 **Run ab with `time` to see actual duration:**
 ```bash
-time ab -n 10000 -c 100 -q https://localhost:8443/
+time ab -n 10000 -c 100 -k -q https://localhost:4431/
 ```
 
 **Results:**
@@ -208,13 +208,13 @@ time ab -n 10000 -c 100 -q https://localhost:8443/
 
 **Test A: Full handshake (no keep-alive)**
 ```bash
-ab -n 1000 -c 10 -q https://localhost:8443/
+ab -n 1000 -c 10 -q https://localhost:4431/
 # Result: _______ req/s
 ```
 
 **Test B: Keep-alive (reuse TLS session)**
 ```bash
-ab -n 1000 -c 10 -k -q https://localhost:8443/
+ab -n 1000 -c 10 -k -q https://localhost:4431/
 # Result: _______ req/s
 ```
 
@@ -264,7 +264,7 @@ Efficiency: (Actual / Theoretical) = _______%
 ### 2. CPU Optimization
 
 **Current setup:**
-- NGINX workers: _______ (check with `docker exec target-nginx ps aux`)
+- NGINX workers: _______ (check with `docker exec pqc-nginx-secure ps aux`)
 - CPU cores: _______
 
 **Recommendation:**
@@ -275,7 +275,7 @@ Efficiency: (Actual / Theoretical) = _______%
 
 **Test if session cache is enabled:**
 ```bash
-docker exec target-nginx nginx -T | grep ssl_session
+docker exec pqc-nginx-secure nginx -T | grep ssl_session
 ```
 
 **Current config:**

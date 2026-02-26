@@ -351,8 +351,11 @@ openssl ecparam -name prime256v1 -genkey -out classical.key
 # Chrome: chrome://settings/certificates
 # Firefox: about:preferences#privacy → View Certificates
 
-# Or use curl with -k flag
-curl -k https://localhost:8443
+# ❌ Host curl ไม่รองรับ PQC signature algorithm (p384_mldsa65)
+# curl -k https://localhost:8443  → exit code 35
+
+# ✅ ใช้ curl ภายใน container แทน
+docker exec pqc-hybrid-nginx curl -k -s -o /dev/null -w "%{http_code}" https://localhost/
 ```
 
 ---

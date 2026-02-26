@@ -146,10 +146,11 @@
 ### Docker Verification
 ```bash
 # Check container status
-[ ] docker ps | grep pqc-hybrid-nginx           # Shows running
-[ ] docker logs pqc-hybrid-nginx | grep error   # No errors
-[ ] curl -k https://localhost:8443              # Returns content
-[ ] curl http://localhost:8080                  # Redirects to HTTPS
+[ ] docker ps | grep pqc-hybrid-nginx             # Shows running
+[ ] docker logs pqc-hybrid-nginx | grep error     # No errors
+# ใช้ curl ภายใน container (ไม่ใช่ host) เพราะ server cert ใช้ PQC signature
+[ ] docker exec pqc-hybrid-nginx curl -k -s -o /dev/null -w "%{http_code}" https://localhost/  # Returns 200
+[ ] curl http://localhost:8080                    # Redirects to HTTPS (HTTP ใช้บน host ได้ปกติ)
 ```
 
 ---
@@ -158,14 +159,14 @@
 
 ### Basic Connectivity
 - [ ] HTTP (8080) redirects to HTTPS
-- [ ] HTTPS (8443) responds
-- [ ] Health check endpoint responds: `curl -k https://localhost:8443/health`
-- [ ] SSL info endpoint shows TLS details: `curl -k https://localhost:8443/ssl-info`
-- [ ] Index page loads in browser
+- [ ] HTTPS (8443) responds (ทดสอบผ่าน docker exec เท่านั้น)
+- [ ] Health check responds: `docker exec pqc-hybrid-nginx curl -k -s https://localhost/health`
+- [ ] SSL info endpoint: `docker exec pqc-hybrid-nginx curl -k -s https://localhost/ssl-info`
+- [ ] Index page loads: `docker exec pqc-hybrid-nginx curl -k -s https://localhost/ | head -5`
 
-### TLS Connection Tests
-- [ ] Classical connection works: `openssl s_client -connect localhost:8443 -groups X25519`
-- [ ] Hybrid connection works: `openssl s_client -connect localhost:8443 -groups x25519_kyber768`
+### TLS Connection Tests (ต้องรันผ่าน container เท่านั้น - host ไม่รองรับ PQC signature)
+- [ ] Classical connection: `docker exec pqc-hybrid-nginx sh -c 'OPENSSL_CONF=/opt/openssl/ssl/openssl.cnf LD_LIBRARY_PATH=/opt/openssl/lib64:/opt/oqs/lib /opt/openssl/bin/openssl s_client -connect localhost:443 -groups X25519 -brief </dev/null 2>&1'`
+- [ ] Hybrid connection: `docker exec pqc-hybrid-nginx sh -c 'OPENSSL_CONF=/opt/openssl/ssl/openssl.cnf LD_LIBRARY_PATH=/opt/openssl/lib64:/opt/oqs/lib /opt/openssl/bin/openssl s_client -connect localhost:443 -groups mlkem768:p384_mlkem768:X25519 -brief </dev/null 2>&1'`
 - [ ] Connection shows TLSv1.3
 - [ ] Connection shows correct cipher suite
 - [ ] Connection shows correct group (x25519_kyber768 for hybrid)

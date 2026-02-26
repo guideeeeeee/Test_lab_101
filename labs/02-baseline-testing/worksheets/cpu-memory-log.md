@@ -9,7 +9,7 @@
 
 ## 📋 Monitoring Setup
 
-**Target Container:** `target-nginx`  
+**Target Container:** `pqc-nginx-secure`  
 **Duration:** 5 minutes of load testing  
 **Load Tool:** Apache Bench (ab) - 1000 requests, 10 concurrent
 
@@ -20,11 +20,17 @@
 ### Method: docker stats
 
 ```bash
-# Run in one terminal
-docker stats target-nginx --no-stream --format "{{.CPUPerc}}" 
+# Terminal 1: บันทึกต่อเนื่องทุก 2 วินาที พร้อม timestamp
+# กด Ctrl+C เพื่อหยุด
+while true; do
+  echo -n "$(date '+%H:%M:%S') | " | tee -a cpu-memory-log.txt
+  docker stats pqc-nginx-secure --no-stream \
+    --format "{{.CPUPerc}} | {{.MemUsage}}" | tee -a cpu-memory-log.txt
+  sleep 2
+done
 
-# While running ab in another terminal
-ab -n 1000 -c 10 -q https://localhost:8443/
+# Terminal 2: รัน load test
+ab -n 1000 -c 10 -k -q https://localhost:4431/
 ```
 
 **Record CPU % every 10 seconds:**
@@ -86,26 +92,27 @@ Percentage increase = (Increase / Idle) × 100 = _______%
 ### Continuous Monitoring
 
 ```bash
-# Record full stats every 30 seconds
-docker stats target-nginx --no-stream
+# ดู snapshot ค่าปัจจุบันครั้งเดียว (สำหรับบันทึก manual)
+docker stats pqc-nginx-secure --no-stream \
+  --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}"
 ```
 
 **Sample 1 (Idle):**
 ```
-CONTAINER     CPU %     MEM USAGE / LIMIT     MEM %     NET I/O        BLOCK I/O
-target-nginx  _____     _____ / _____         _____     _____ / _____  _____ / _____
+CONTAINER          CPU %     MEM USAGE / LIMIT     MEM %     NET I/O        BLOCK I/O
+pqc-nginx-secure   _____     _____ / _____         _____     _____ / _____  _____ / _____
 ```
 
 **Sample 2 (Under Load):**
 ```
-CONTAINER     CPU %     MEM USAGE / LIMIT     MEM %     NET I/O        BLOCK I/O
-target-nginx  _____     _____ / _____         _____     _____ / _____  _____ / _____
+CONTAINER          CPU %     MEM USAGE / LIMIT     MEM %     NET I/O        BLOCK I/O
+pqc-nginx-secure   _____     _____ / _____         _____     _____ / _____  _____ / _____
 ```
 
 **Sample 3 (Peak):**
 ```
-CONTAINER     CPU %     MEM USAGE / LIMIT     MEM %     NET I/O        BLOCK I/O
-target-nginx  _____     _____ / _____         _____     _____ / _____  _____ / _____
+CONTAINER          CPU %     MEM USAGE / LIMIT     MEM %     NET I/O        BLOCK I/O
+pqc-nginx-secure   _____     _____ / _____         _____     _____ / _____  _____ / _____
 ```
 
 ---
@@ -116,7 +123,10 @@ target-nginx  _____     _____ / _____         _____     _____ / _____  _____ / _
 
 ```bash
 # Enter container
-docker exec -it target-nginx top
+docker exec -it pqc-nginx-secure sh
+
+# Inside container, run:
+top
 
 # Record nginx worker process stats
 ```
@@ -170,21 +180,21 @@ CPU Usage (%)
 
 **Test A: Short burst (100 requests, 10 concurrent)**
 ```bash
-ab -n 100 -c 10 -q https://localhost:8443/
+ab -n 100 -c 10 -k -q https://localhost:4431/
 ```
 - Peak CPU: _______%
 - Peak Memory: _______ MiB
 
 **Test B: Sustained load (10,000 requests, 50 concurrent)**
 ```bash
-ab -n 10000 -c 50 -q https://localhost:8443/
+ab -n 10000 -c 50 -k -q https://localhost:4431/
 ```
 - Peak CPU: _______%
 - Peak Memory: _______ MiB
 
 **Test C: High concurrency (10,000 requests, 200 concurrent)**
 ```bash
-ab -n 10000 -c 200 -q https://localhost:8443/
+ab -n 10000 -c 200 -k -q https://localhost:4431/
 ```
 - Peak CPU: _______%
 - Peak Memory: _______ MiB

@@ -44,12 +44,12 @@ After this lab, you will be able to:
 
 ```bash
 # Single measurement
-curl -k -o /dev/null -s -w "Handshake: %{time_connect}s\nTotal: %{time_total}s\n" https://localhost
+curl -k -o /dev/null -s -w "Handshake: %{time_connect}s\nTotal: %{time_total}s\n" https://localhost:4431
 
-# Run 20 times and record
+# Run 20 times and record (secure server port 4431)
 for i in {1..20}; do
-  curl -k -o /dev/null -s -w "%{time_connect}\n" https://localhost
-done > handshake_times.txt
+  curl -k -o /dev/null -s -w "%{time_connect}\n" https://localhost:4431
+done > handshake_times_4431.txt
 ```
 
 ### Record in Worksheet
@@ -89,13 +89,16 @@ openssl s_time -connect localhost:4431 -time 30 -new -nbio
 
 ### Monitoring CPU
 
-**Terminal 1: Start monitoring**
+**Terminal 1: Start monitoring (บันทึกต่อเนื่องทุก 2 วินาที)**
 ```bash
-# Monitor NGINX CPU usage (secure server = pre-PQC baseline)
-docker stats pqc-nginx-secure --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}"
-
-# แสดงเฉพาะ container ที่กำลังทำงาน
- docker stats pqc-nginx-secure --no-trunc --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}"
+# บันทึก CPU + Memory ลงไฟล์ + แสดงบน terminal พร้อมกัน
+# กด Ctrl+C เพื่อหยุด
+while true; do
+  echo -n "$(date '+%H:%M:%S') | " | tee -a cpu-memory-log.txt
+  docker stats pqc-nginx-secure --no-stream \
+    --format "{{.CPUPerc}}\t{{.MemUsage}}" | tee -a cpu-memory-log.txt
+  sleep 2
+done
 ```
 
 **Terminal 2: Generate load**
@@ -179,22 +182,33 @@ ls -lh cert-chain.pem
 
 ### TLS Handshake Packet Capture
 
+> **หมายเหตุ:** `sudo tcpdump` บน host อาจใช้งานไม่ได้หาก ไม่มีสิทธิ์ ใช้วิธี `docker exec` แทนซึ่งทำงานได้โดยไม่ต้อง sudo
+
 ```bash
-# Capture first 20 packets
-sudo tcpdump -i any -w handshake.pcap 'port 443' -c 20 &
-TCPDUMP_PID=$!
+# ติดตั้ง tcpdump ใน container (Alpine Linux)
+docker exec pqc-nginx-secure apk add --no-cache tcpdump
 
-# Trigger handshake
-curl -k https://localhost > /dev/null
+# เริ่ม capture ใน background (port 443 = ภายใน container)
+docker exec -d pqc-nginx-secure sh -c \
+  "tcpdump -i eth0 'port 443' -c 50 -w /tmp/handshake.pcap 2>/tmp/tcpdump.log"
 
-# Stop capture
 sleep 1
-sudo kill $TCPDUMP_PID
 
-# Analyze with tcpdump
-tcpdump -r handshake.pcap -v
+# Trigger handshakes
+for i in {1..5}; do curl -k -s https://localhost:4431 > /dev/null; done
 
-# Or use Wireshark
+sleep 2
+
+# ตรวจสอบผลลัพธ์
+docker exec pqc-nginx-secure cat /tmp/tcpdump.log
+
+# Copy ไฟล์ออกมา
+docker cp pqc-nginx-secure:/tmp/handshake.pcap ./handshake.pcap
+
+# วิเคราะห์ packet sizes
+docker exec pqc-nginx-secure tcpdump -r /tmp/handshake.pcap -nn -q 2>/dev/null
+
+# หรือ Wireshark (ถ้าติดตั้งไว้)
 wireshark handshake.pcap &
 ```
 
@@ -215,10 +229,10 @@ Use the handshake times you collected:
 
 ```bash
 # Sort times
-sort -n handshake_times.txt > sorted_times.txt
+sort -n handshake_times_4431.txt > sorted_times.txt
 
 # Calculate average (using awk)
-awk '{ total += $1; count++ } END { print total/count }' handshake_times.txt
+awk '{ total += $1; count++ } END { print total/count }' handshake_times_4431.txt
 
 # Find median (middle value)
 cat sorted_times.txt | sed -n '10p'  # For 20 samples, median is 10th value
@@ -231,10 +245,9 @@ tail -1 sorted_times.txt  # Max
 ### Using Python (Helper Script)
 
 ```bash
-python3 scripts/calculate-stats.py handshake_times.txt
+# สคริปต์อยู่ที่ root ของ workspace
+python3 ../../../scripts/calculate-stats.py --stdin < handshake_times_4431.txt
 ```
-
-📝 **Template: [calculations/statistical-formulas.md](calculations/statistical-formulas.md)**
 
 ---
 
@@ -286,7 +299,7 @@ Before proceeding to Lab 03:
 ## 📁 Files Structure
 
 ```
-lab s/02-baseline-testing/
+labs/02-baseline-testing/
 ├── README.md (this file)
 │
 ├── worksheets/
@@ -296,21 +309,14 @@ lab s/02-baseline-testing/
 │   ├── packet-analysis.md
 │   └── baseline-summary.md ⭐ (final report)
 │
-├── scripts/
-│   ├── calculate-stats.py (calculate mean, median, std dev)
-│   ├── monitor-cpu.sh (continuous CPU monitoring)
-│   ├── automated-tests.sh (run all tests - optional)
-│   └── visualize-results.py (generate charts)
-│
-├── calculations/
-│   ├── statistical-formulas.md (how to calculate manually)
-│   └── spreadsheet-template.xlsx (Excel template)
-│
-└── results/
-    ├── handshake_times.txt (your measurements)
-    ├── ab-test1.txt
-    ├── ab-test2.txt
-    └── baseline-summary.json (structured data)
+├── handshake_times_4431.txt   (measurement output)
+├── handshake_times_4430.txt   (vulnerable server, for comparison)
+├── handshake.pcap             (packet capture - generated in Step 4)
+├── cert-chain.pem             (certificate - generated in Step 4)
+└── ab-test1.txt / ab-test2.txt / ab-test3.txt  (throughput results)
+
+# สคริปต์ calculate-stats.py อยู่ที่:
+# ../../scripts/calculate-stats.py  (root workspace)
 ```
 
 ---
@@ -330,8 +336,13 @@ brew install httpd
 ### Issue: tcpdump permission denied
 
 ```bash
-# Run with sudo or add user to pcap group
-sudo tcpdump -i any 'port 443'
+# วิธีที่ดีที่สุด: รัน tcpdump ภายใน container (ไม่ต้อง sudo)
+docker exec pqc-nginx-secure apk add --no-cache tcpdump
+docker exec -d pqc-nginx-secure sh -c \
+  "tcpdump -i eth0 'port 443' -c 50 -w /tmp/handshake.pcap"
+
+# หรือเพิ่ม user เข้า pcap group (ต้อง logout/login ใหม่)
+sudo usermod -a -G pcap $USER
 ```
 
 ### Issue: Inconsistent measurements
